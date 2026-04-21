@@ -1,0 +1,6 @@
+packages:
+  - "console"
+  - "mobile"
+  - "extension"
+  - "desktop"
+  - "packages/*"

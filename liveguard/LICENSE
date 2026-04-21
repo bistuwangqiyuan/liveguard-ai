@@ -1,0 +1,29 @@
+                              Apache License
+                        Version 2.0, January 2004
+                     http://www.apache.org/licenses/
+
+   Copyright 2026 LiveGuard AI Inc. (北京守播智能科技有限公司)
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+
+   ===========================================================================
+   THIRD-PARTY NOTICES
+   ===========================================================================
+   This product includes third-party software licensed under their own
+   respective licenses. See `docs/security/third-party-licenses.md` for the
+   complete list. Notably:
+     - PyTorch / FastAPI / ONNXRuntime: BSD-3 / MIT
+     - Next.js / React / Tailwind / shadcn-ui: MIT
+     - SCRFD / RetinaFace / YOLOv8 / OSNet / VideoMAE / ECAPA-TDNN:
+       see each project's LICENSE; LiveGuard fine-tuned weights are
+       redistributed under Apache-2.0 unless otherwise noted.

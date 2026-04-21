@@ -1,0 +1,148 @@
+# 守播 LiveGuard AI · 本地全栈开发栈
+#
+# 启动：  docker compose -f infra/docker-compose.yml up -d
+# 关闭：  docker compose -f infra/docker-compose.yml down
+#
+# 组件：
+#   - postgres (Timescale + pgvector 扩展)
+#   - redis 7
+#   - zookeeper + kafka (bitnami)
+#   - minio (S3 对象存储，用于视频证据存档)
+#   - prometheus + grafana (可观测)
+#   - liveguard-backend (FastAPI)
+#   - liveguard-notify (FastAPI · Kafka consumer)
+#   - liveguard-console (Next.js)
+#
+# 注意：生产环境请使用 Kubernetes Helm Chart（见 infra/helm/），
+# docker-compose 仅用于开发 & 演示。
+
+x-env: &backend-env
+  LVG_ENV: dev
+  LVG_DATABASE_URL: postgresql+asyncpg://liveguard:liveguard@postgres:5432/liveguard
+  LVG_REDIS_URL: redis://redis:6379/0
+  LVG_KAFKA_BOOTSTRAP: kafka:9092
+  LVG_JWT_SECRET: change-me-in-prod
+  LVG_CORS_ORIGINS: "http://localhost:3000"
+  LVG_TRUSTED_HOSTS: "localhost,127.0.0.1,backend"
+
+services:
+  postgres:
+    image: timescale/timescaledb-ha:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: liveguard
+      POSTGRES_PASSWORD: liveguard
+      POSTGRES_DB: liveguard
+    ports: ["5432:5432"]
+    volumes:
+      - pgdata:/home/postgres/pgdata
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U liveguard -d liveguard"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports: ["6379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  zookeeper:
+    image: bitnami/zookeeper:3.9
+    environment:
+      ALLOW_ANONYMOUS_LOGIN: "yes"
+    ports: ["2181:2181"]
+
+  kafka:
+    image: bitnami/kafka:3.7
+    depends_on: [zookeeper]
+    environment:
+      KAFKA_BROKER_ID: "1"
+      KAFKA_CFG_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_CFG_LISTENERS: PLAINTEXT://:9092,PLAINTEXT_HOST://:29092
+      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_CFG_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      ALLOW_PLAINTEXT_LISTENER: "yes"
+      KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: "true"
+    ports: ["29092:29092"]
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics.sh --bootstrap-server localhost:9092 --list"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  minio:
+    image: minio/minio:RELEASE.2024-08-29T01-40-52Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: liveguard
+      MINIO_ROOT_PASSWORD: liveguardminio
+    ports: ["9000:9000", "9001:9001"]
+    volumes: [miniodata:/data]
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports: ["9090:9090"]
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: liveguard
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    ports: ["3001:3000"]
+    volumes: [grafanadata:/var/lib/grafana]
+
+  backend:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    environment:
+      <<: *backend-env
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+    ports: ["8080:8080"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8080/healthz').read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  notify:
+    build:
+      context: ..
+      dockerfile: notify/Dockerfile
+    restart: unless-stopped
+    environment:
+      LVG_KAFKA_BOOTSTRAP: kafka:9092
+    depends_on:
+      kafka: { condition: service_healthy }
+    ports: ["8081:8081"]
+
+  console:
+    build:
+      context: ../console
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      LVG_BACKEND_URL: http://backend:8080
+      NODE_ENV: production
+    depends_on:
+      backend: { condition: service_healthy }
+    ports: ["3000:3000"]
+
+volumes:
+  pgdata:
+  miniodata:
+  grafanadata:

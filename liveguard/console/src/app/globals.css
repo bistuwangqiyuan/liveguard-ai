@@ -1,0 +1,48 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-sans:
+    "Inter", "PingFang SC", "Microsoft YaHei", system-ui, -apple-system,
+    BlinkMacSystemFont, sans-serif;
+}
+
+html,
+body {
+  min-height: 100%;
+  background: radial-gradient(
+      1200px 600px at 20% -10%,
+      rgba(31, 111, 255, 0.15),
+      transparent
+    ),
+    radial-gradient(
+      1200px 600px at 85% 110%,
+      rgba(15, 82, 219, 0.12),
+      transparent
+    ),
+    #0b0f1a;
+}
+
+@layer components {
+  .card {
+    @apply rounded-2xl border border-surface-border bg-surface-elev1/80 p-6 shadow-card backdrop-blur;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-surface-border bg-surface-elev2 px-2.5 py-1 text-xs text-slate-200;
+  }
+
+  .severity-p0 {
+    @apply border-severity-p0/50 bg-severity-p0/10 text-red-300;
+  }
+  .severity-p1 {
+    @apply border-severity-p1/50 bg-severity-p1/10 text-orange-300;
+  }
+  .severity-p2 {
+    @apply border-severity-p2/50 bg-severity-p2/10 text-amber-300;
+  }
+  .severity-info {
+    @apply border-severity-info/40 bg-severity-info/10 text-emerald-300;
+  }
+}

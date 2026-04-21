@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>LiveGuard · 守播</title>
+    <style>
+      :root { color-scheme: dark; }
+      body {
+        margin: 0;
+        width: 320px;
+        padding: 16px;
+        background: #0B0F1A;
+        color: #F1F5F9;
+        font-family: "Inter","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+      }
+      h1 { margin: 0 0 8px; font-size: 15px; font-weight: 600; }
+      .tag { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; background: #1F2B4C; color: #BFDBFE; }
+      .row { display: flex; justify-content: space-between; font-size: 12px; color: #94A3B8; padding: 6px 0; border-bottom: 1px solid #1F2B4C; }
+      .row:last-child { border: 0; }
+      .row b { color: #F1F5F9; font-weight: 500; }
+      a.btn { display: block; margin-top: 12px; padding: 8px 10px; border-radius: 10px; background: #1F6FFF; color: #fff; text-align: center; text-decoration: none; font-size: 13px; }
+      .state-ON_DUTY { color: #10B981; }
+      .state-BRIEF_AWAY { color: #F59E0B; }
+      .state-LONG_AWAY { color: #F97316; }
+      .state-CHEAT_FLAGGED { color: #E4000F; }
+    </style>
+  </head>
+  <body>
+    <h1>守播 LiveGuard <span class="tag">v1.0</span></h1>
+    <div class="row"><span>当前站点</span><b id="host">—</b></div>
+    <div class="row"><span>FSM 状态</span><b id="state" class="state-IDLE">IDLE</b></div>
+    <div class="row"><span>亮度</span><b id="brightness">—</b></div>
+    <div class="row"><span>运动量</span><b id="motion">—</b></div>
+    <div class="row"><span>后端</span><b id="backend">—</b></div>
+    <a class="btn" href="options.html" target="_blank">打开设置</a>
+    <script src="popup.js"></script>
+  </body>
+</html>

@@ -1,0 +1,113 @@
+[build-system]
+requires = ["hatchling>=1.21"]
+build-backend = "hatchling.build"
+
+[project]
+name = "liveguard-monorepo"
+version = "1.0.0"
+description = "守播 LiveGuard AI · 视频直播监控智能体 (monorepo root, dev tooling only)"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+authors = [
+    { name = "LiveGuard AI", email = "dev@liveguard.ai" },
+]
+
+# Root project intentionally has no runtime deps; sub-packages declare their own.
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "pytest-asyncio>=0.23",
+    "ruff>=0.5",
+    "black>=24.4",
+    "mypy>=1.10",
+    "pre-commit>=3.7",
+    "ipython>=8.20",
+]
+docs = [
+    "mkdocs>=1.6",
+    "mkdocs-material>=9.5",
+]
+
+# ---------------------------------------------------------------------------
+# Tooling configuration shared by all sub-packages
+# ---------------------------------------------------------------------------
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["build", "dist", ".venv", "node_modules", "*.ipynb"]
+
+[tool.ruff.lint]
+select = [
+    "E", "F", "W",        # pycodestyle / pyflakes
+    "I",                   # isort
+    "N",                   # pep8-naming
+    "UP",                  # pyupgrade
+    "B",                   # bugbear
+    "C4",                  # comprehensions
+    "SIM",                 # simplify
+    "RUF",                 # ruff-specific
+    "PL",                  # pylint
+    "S",                   # bandit security
+    "ASYNC",               # async best practices
+]
+ignore = [
+    "PLR0913",   # too many args (FSM constructors legit)
+    "PLR2004",   # magic numbers (used for state thresholds)
+    "S101",      # asserts in tests OK
+]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["S", "PLR", "ARG"]
+"**/conftest.py" = ["S"]
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = false
+warn_unused_ignores = true
+disallow_untyped_decorators = false
+ignore_missing_imports = true
+plugins = []
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+    "--cov-config=pyproject.toml",
+]
+testpaths = ["algo/tests", "backend/tests", "models/tests"]
+asyncio_mode = "auto"
+markers = [
+    "slow: marks tests as slow (deselect with '-m not slow')",
+    "integration: integration tests requiring docker-compose stack",
+    "gpu: tests requiring GPU",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["algo", "backend", "models"]
+omit = [
+    "*/tests/*",
+    "*/__main__.py",
+    "*/migrations/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+]
+fail_under = 75

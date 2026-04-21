@@ -1,0 +1,55 @@
+# Monorepo root — 视频直播监控软件 / LiveGuard
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+.coverage.*
+dist/
+build/
+
+# Node
+node_modules/
+.next/
+out/
+.turbo/
+.pnpm-store/
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+
+# Secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+secrets.json
+
+# Large / generated
+**/models/weights/*.onnx
+**/models/weights/*.pt
+**/models/weights/*.bin
+**/data/raw/
+**/outputs/
+*.mp4
+*.wav
+*.flac
+logs/
+*.log
+
+# Docker local volumes
+.docker-volumes/
+
+# Cursor IDE (local hooks / state — do not publish)
+.cursor/

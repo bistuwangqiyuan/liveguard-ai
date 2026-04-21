@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>LiveGuard · 设置</title>
+    <style>
+      :root { color-scheme: dark; }
+      body {
+        margin: 0 auto;
+        max-width: 560px;
+        padding: 32px;
+        background: #0B0F1A;
+        color: #F1F5F9;
+        font-family: "Inter","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+      }
+      h1 { font-size: 20px; margin: 0 0 4px; }
+      p.sub { color: #94A3B8; font-size: 13px; margin-top: 0; }
+      label { display: block; margin-top: 16px; font-size: 13px; color: #CBD5E1; }
+      input[type=text], input[type=password] {
+        width: 100%;
+        padding: 8px 10px;
+        margin-top: 6px;
+        background: #111727;
+        color: #F1F5F9;
+        border: 1px solid #1F2B4C;
+        border-radius: 8px;
+        font-family: monospace;
+      }
+      .row { display: flex; align-items: center; gap: 8px; margin-top: 16px; }
+      button {
+        margin-top: 24px;
+        background: #1F6FFF;
+        border: 0;
+        color: #fff;
+        padding: 10px 16px;
+        border-radius: 10px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .saved { color: #10B981; font-size: 12px; margin-left: 8px; }
+    </style>
+  </head>
+  <body>
+    <h1>LiveGuard AI · 设置</h1>
+    <p class="sub">连接守播后端 · 配置租户与隐私模式</p>
+
+    <label>后端 URL
+      <input id="backendUrl" type="text" placeholder="http://localhost:8080" />
+    </label>
+    <label>租户 ID
+      <input id="tenantId" type="text" placeholder="t_demo" />
+    </label>
+    <label>Stream ID
+      <input id="streamId" type="text" placeholder="str_demo_custom" />
+    </label>
+    <label>Bearer Token
+      <input id="token" type="password" placeholder="eyJhbGciOi..." />
+    </label>
+
+    <div class="row">
+      <input id="privacyMode" type="checkbox" />
+      <label for="privacyMode" style="margin:0;">启用隐私模式（仅上传特征向量，不上传画面）</label>
+    </div>
+
+    <button id="save">保存</button>
+    <span id="saved" class="saved" hidden>已保存</span>
+
+    <script src="options.js"></script>
+  </body>
+</html>

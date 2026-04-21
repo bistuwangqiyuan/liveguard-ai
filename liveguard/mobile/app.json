@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "LiveGuard AI",
+    "slug": "liveguard",
+    "scheme": "liveguard",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0B0F1A"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "ai.liveguard.app"
+    },
+    "android": {
+      "package": "ai.liveguard.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0B0F1A"
+      }
+    },
+    "plugins": ["expo-notifications"]
+  }
+}

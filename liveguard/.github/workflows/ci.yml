@@ -1,0 +1,150 @@
+name: liveguard-ci
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # 1. Python — algo / backend / notify / edge / models
+  # ---------------------------------------------------------------------------
+  python:
+    name: Python · ${{ matrix.module }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        module: [algo, backend, notify, edge, models]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install (${{ matrix.module }})
+        run: |
+          python -m pip install --upgrade pip wheel
+          if [ "${{ matrix.module }}" = "algo" ]; then
+            pip install -e "./algo[dev]"
+          elif [ "${{ matrix.module }}" = "backend" ]; then
+            pip install -e "./algo"
+            pip install -e "./backend[dev]"
+          elif [ "${{ matrix.module }}" = "notify" ]; then
+            pip install -e "./notify[dev]"
+          elif [ "${{ matrix.module }}" = "edge" ]; then
+            pip install -e "./algo"
+            pip install -e "./edge[dev]"
+          elif [ "${{ matrix.module }}" = "models" ]; then
+            pip install -r models/python_models/requirements.txt || true
+            pip install numpy
+          fi
+
+      - name: Lint
+        if: matrix.module != 'models'
+        run: |
+          pip install ruff
+          ruff check ${{ matrix.module }}
+
+      - name: Test
+        if: matrix.module != 'models'
+        env:
+          PYTHONIOENCODING: utf-8
+          LVG_ENV: test
+          LVG_DATABASE_URL: sqlite+aiosqlite:///:memory:
+        run: |
+          pytest -q ${{ matrix.module }}/tests
+
+      - name: Run business models
+        if: matrix.module == 'models'
+        env:
+          PYTHONIOENCODING: utf-8
+        working-directory: models/python_models
+        run: |
+          python 01_market_sizing.py
+          python 02_unit_economics.py
+          python 03_roi_merchant.py
+          python 04_slo_latency_budget.py
+          python 05_alerts_capacity_erlangc.py
+          python 06_dedup_suppression_sim.py
+          python 07_growth_cohort.py
+
+  # ---------------------------------------------------------------------------
+  # 2. Web console (Next.js)
+  # ---------------------------------------------------------------------------
+  console:
+    name: Web · console
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: console
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: console/package-lock.json
+      - run: npm install --no-audit --no-fund
+      - run: npm run typecheck
+      - run: npm run lint --if-present
+      - run: npm run build
+
+  # ---------------------------------------------------------------------------
+  # 3. Docker build smoke (不 push)
+  # ---------------------------------------------------------------------------
+  docker:
+    name: Docker · build
+    runs-on: ubuntu-latest
+    needs: [python, console]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build backend
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: backend/Dockerfile
+          push: false
+          tags: liveguard/backend:ci
+      - name: Build notify
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: notify/Dockerfile
+          push: false
+          tags: liveguard/notify:ci
+      - name: Build console
+        uses: docker/build-push-action@v6
+        with:
+          context: console
+          file: console/Dockerfile
+          push: false
+          tags: liveguard/console:ci
+
+  # ---------------------------------------------------------------------------
+  # 4. 安全扫描（软失败）
+  # ---------------------------------------------------------------------------
+  security:
+    name: Security · pip-audit / npm-audit
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install pip-audit
+      - run: pip-audit -r backend/pyproject.toml || true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - working-directory: console
+        run: npm audit --omit=dev || true
