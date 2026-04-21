@@ -1,0 +1,12 @@
+# Netlify builds from repository root; the Next.js app lives under liveguard/console.
+# https://docs.netlify.com/build/frameworks/framework-setup-guides/next-js/overview/
+
+[build]
+  base = "liveguard/console"
+  command = "npm ci && npm run build"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"

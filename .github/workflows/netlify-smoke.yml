@@ -1,0 +1,31 @@
+# After Netlify rebuilds from main, the production URL should return HTTP 200.
+name: netlify-smoke
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for Netlify and verify home page
+        run: |
+          set -e
+          URL="https://liveguard-ai.netlify.app/"
+          for i in $(seq 1 20); do
+            code=$(curl -sS -o /tmp/netlify_body.html -w "%{http_code}" "$URL" || true)
+            echo "attempt $i: HTTP $code"
+            if [ "$code" = "200" ]; then
+              if grep -q "总览 Dashboard" /tmp/netlify_body.html; then
+                echo "OK: page contains expected title"
+                exit 0
+              fi
+              echo "WARN: 200 but unexpected body"
+            fi
+            sleep 20
+          done
+          echo "Last response body (first 800 bytes):"
+          head -c 800 /tmp/netlify_body.html || true
+          exit 1
