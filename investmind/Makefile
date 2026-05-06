@@ -2,7 +2,7 @@
 
 PY ?= python3
 MODELS_DIR = models/python_models
-BUILD_DIR = build
+BUILD_DIR = bp_build
 
 models:
 	cd $(MODELS_DIR) && \
