@@ -2,82 +2,113 @@
 03_roi_merchant.py
 ==================
 
-商家侧 ROI — 订阅 LiveGuard vs 不订阅。
-
+客户侧 ROI 计算器（演示用）。对应 BP §5.5。
 模型：
-    净收益 = (避免的合规罚款 + 减少的 GMV 流失 + 节省的人工成本)
-              - 订阅费
+    现有损失 = 年 GMV × (空播损失率 9.0% + 平台罚款率 2.5%)
+    部署后损失 = 年 GMV × (空播 9.0%×30% + 罚款 2.5%×16%) = 年 GMV × 3.1%
+    年节省 = 现有损失 − 部署后损失
+    ROI = (年节省 − 工具年费) / 工具年费
+    回本天数 = 工具年费 / (年节省 / 365)
 
-ASSUMPTIONS
------------
-* 典型商家月均直播 240 小时（每天 8h × 30d）
-* 每次离岗/脱岗平均 GMV 流失 ≈ 1,400 元/次（抖音电商 2024 年直播电商 GMV 转化均值反推）
-* 传统方案（人工看守 1:3 比例、每人 800 元/月）人工成本 × 被监控主播数
-* LiveGuard 套餐 Pro 月 ¥1,299，覆盖 5 路并发
-
-SOURCES
--------
-* 抖音电商 2024 年直播电商转化数据
-* 艾瑞 2024 年直播电商主播运营成本白皮书
-* 国家市监总局 2024 年直播电商违规典型案例公告
+三档客户：个人主播 / 中型 MCN / 头部 MCN。
+SOURCES：抖音电商 2024 转化数据、艾瑞 2024 主播运营成本白皮书、市监总局违规案例。
 """
 
 from __future__ import annotations
 
 import numpy as np
+import matplotlib.pyplot as plt
 
-from _common import fmt_cny, write_json
+from _common import BRAND, PALETTE, fmt_cny, save_chart, write_json, N_SIM, rng
+import data_sources as DS
 
-rng = np.random.default_rng(21)
-N = 200_000
+r = rng()
+N = N_SIM
 
-hours_monthly = rng.triangular(180, 240, 360, N)
-offline_incidents_per_hour = rng.triangular(0.6, 1.1, 1.8, N) / 10  # 每 10 小时次数
-gmv_loss_per_incident = rng.triangular(700, 1400, 2600, N)
+# 损失率参数（基线）
+IDLE_LOSS = 0.09          # 空播损失率
+PENALTY_RATE = 0.025      # 平台罚款率
+IDLE_RESIDUAL = 0.30      # 部署后空播残留比例
+PENALTY_RESIDUAL = 0.16   # 部署后罚款残留比例
 
-# LiveGuard 拦截率（算法 + 人工复核）
-interception_rate = rng.triangular(0.75, 0.88, 0.95, N)
+segments = [
+    {"name": "个人主播 / 小商家", "daily_gmv": 6_000,   "annual_fee": DS.PRICING["Starter"]["annual"]},
+    {"name": "中型 MCN / 品牌自播", "daily_gmv": 35_000,  "annual_fee": DS.PRICING["Pro"]["annual"]},
+    {"name": "头部 MCN / 大型电商", "daily_gmv": 220_000, "annual_fee": DS.PRICING["Enterprise"]["annual"]},
+]
 
-# 合规罚款期望（每月罚款事件概率 × 罚款金额）
-penalty_prob = rng.triangular(0.02, 0.05, 0.10, N)
-penalty_amount = rng.triangular(5000, 20000, 80000, N)
-expected_penalty_saving = penalty_prob * penalty_amount * rng.triangular(0.5, 0.8, 0.95, N)
+rows = []
+for s in segments:
+    annual_gmv = s["daily_gmv"] * 360
+    existing_loss = annual_gmv * (IDLE_LOSS + PENALTY_RATE)
+    post_loss = annual_gmv * (IDLE_LOSS * IDLE_RESIDUAL + PENALTY_RATE * PENALTY_RESIDUAL)
+    saving = existing_loss - post_loss
+    roi = (saving - s["annual_fee"]) / s["annual_fee"]
+    payback_days = s["annual_fee"] / (saving / 365)
+    rows.append({
+        "segment": s["name"],
+        "daily_gmv_CNY": s["daily_gmv"],
+        "annual_gmv_CNY": round(annual_gmv, 0),
+        "existing_loss_CNY": round(existing_loss, 0),
+        "post_loss_CNY": round(post_loss, 0),
+        "annual_saving_CNY": round(saving, 0),
+        "annual_fee_CNY": s["annual_fee"],
+        "ROI_x": round(roi, 1),
+        "payback_days": round(payback_days, 1),
+    })
 
-# 传统看守成本：按 1:3 覆盖 5 路并发 → 5/3 ≈ 1.67 人
-traditional_staff_cost = 1.67 * rng.triangular(600, 800, 1100, N)
-
-# GMV 流失减少
-incidents_monthly = hours_monthly * offline_incidents_per_hour
-gmv_saving = incidents_monthly * gmv_loss_per_incident * interception_rate
-
-# 订阅费
-subscription_fee = rng.triangular(299, 1299, 4999, N)
-
-net_benefit = gmv_saving + expected_penalty_saving + traditional_staff_cost - subscription_fee
-roi_pct = net_benefit / subscription_fee * 100
+# ROI 敏感性：空播损失率 r0 从 1% → 12%（Pro 档）
+r0_grid = np.linspace(0.01, 0.12, 40)
+pro = segments[1]
+pro_gmv = pro["daily_gmv"] * 360
+roi_curve = []
+for r0 in r0_grid:
+    existing = pro_gmv * (r0 + PENALTY_RATE)
+    post = pro_gmv * (r0 * IDLE_RESIDUAL + PENALTY_RATE * PENALTY_RESIDUAL)
+    sv = existing - post
+    roi_curve.append((sv - pro["annual_fee"]) / pro["annual_fee"])
 
 payload = {
-    "assumptions": {
-        "hours_monthly": [180, 240, 360],
-        "incidents_per_10h": [0.6, 1.1, 1.8],
-        "gmv_loss_per_incident_CNY": [700, 1400, 2600],
-        "interception_rate": [0.75, 0.88, 0.95],
-        "subscription_fee_CNY": [299, 1299, 4999],
+    "as_of": DS.AS_OF, "currency": "CNY",
+    "model": {
+        "idle_loss_rate": IDLE_LOSS, "penalty_rate": PENALTY_RATE,
+        "idle_residual": IDLE_RESIDUAL, "penalty_residual": PENALTY_RESIDUAL,
+        "open_days_per_year": 360,
     },
-    "monthly_gmv_saving_CNY_median": fmt_cny(float(np.median(gmv_saving))),
-    "monthly_penalty_saving_CNY_median": fmt_cny(float(np.median(expected_penalty_saving))),
-    "monthly_labor_saving_CNY_median": fmt_cny(float(np.median(traditional_staff_cost))),
-    "monthly_net_benefit_CNY_median": fmt_cny(float(np.median(net_benefit))),
-    "ROI_pct_median": round(float(np.median(roi_pct)), 1),
-    "ROI_pct_p5_p95": [round(float(np.percentile(roi_pct, 5)), 1),
-                       round(float(np.percentile(roi_pct, 95)), 1)],
-    "payback_days_median": round(30 * float(np.median(subscription_fee)) /
-                                 float(np.median(net_benefit + subscription_fee)), 1),
+    "segments": rows,
+    "sensitivity_pro_idle_loss": {
+        "idle_loss_grid": [round(x, 3) for x in r0_grid.tolist()],
+        "roi_x": [round(x, 1) for x in roi_curve],
+    },
+    "sources": ["抖音电商 2024 转化数据", "艾瑞 2024 主播运营成本白皮书", "市监总局 2024 违规典型案例"],
 }
 
-print("── 商家 ROI ──")
-print(f"  月净收益 = {payload['monthly_net_benefit_CNY_median']}  "
-      f"ROI = {payload['ROI_pct_median']}%  (90% CI {payload['ROI_pct_p5_p95']}%)")
-print(f"  回本天数 ≈ {payload['payback_days_median']} 天")
+print("── 客户 ROI ──")
+for row in rows:
+    print(f"  {row['segment']:<18s} ROI {row['ROI_x']:>6}×  回本 {row['payback_days']:>5} 天  "
+          f"年节省 {fmt_cny(row['annual_saving_CNY'])}")
 
 write_json("03_roi_merchant", payload)
+
+# ── 图：ROI 柱状 + 敏感性 ───────────────────────────────────────────────────
+fig, axs = plt.subplots(1, 2, figsize=(12.0, 4.6))
+names = [r["segment"].split(" / ")[0] for r in rows]
+rois = [r["ROI_x"] for r in rows]
+bars = axs[0].bar(names, rois, color=[BRAND["blue"], BRAND["teal"], BRAND["violet"]], width=0.55, alpha=0.92)
+for i, r_ in enumerate(rows):
+    axs[0].text(i, rois[i] * 1.02, f"{rois[i]}×\n回本{r_['payback_days']}天", ha="center", fontsize=9, color=BRAND["ink"])
+axs[0].set_ylabel("ROI (倍)")
+axs[0].set_title("三档客户 ROI（最长回本 < 14 天）", pad=8)
+
+axs[1].plot(r0_grid * 100, roi_curve, "-", color=BRAND["blue"], lw=2.4)
+axs[1].axhline(5, color=BRAND["red"], ls="--", lw=1.2, label="ROI 5×")
+axs[1].fill_between(r0_grid * 100, roi_curve, alpha=0.12, color=BRAND["blue"])
+axs[1].set_xlabel("客户当前空播损失率 r0 (%)")
+axs[1].set_ylabel("Pro 档 ROI (倍)")
+axs[1].set_title("ROI 敏感性（即使 r0=1% 仍 ≥ 5×）", pad=8)
+axs[1].legend(fontsize=9)
+fig.suptitle("§5.5 客户 ROI 计算器", fontsize=13, fontweight="bold", color=BRAND["ink"], y=1.02)
+fig.tight_layout()
+save_chart(fig, "fig_03_roi_customer")
+
+print("✓ 03_roi_merchant 完成 → JSON + fig_03_roi_customer.png")

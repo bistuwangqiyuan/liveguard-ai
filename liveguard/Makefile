@@ -1,55 +1,24 @@
-# 守播 LiveGuard AI · 顶级开发命令
-# Use:  make help
+.PHONY: all models assemble docx pdf clean
 
-.PHONY: help install dev test lint format models bench seed up down clean spec-status
+PY ?= python
+MODELS_DIR = models/python_models
+BUILD_DIR = bp_build
 
-PYTHON ?= python3
-PNPM   ?= pnpm
+models:
+	cd $(MODELS_DIR) && $(PY) run_all.py
 
-help:                    ## 显示所有命令
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
-		| awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-22s\033[0m %s\n", $$1, $$2}'
+assemble:
+	$(PY) $(BUILD_DIR)/assemble_md.py
 
-install:                 ## 安装 Python + Node 依赖
-	$(PYTHON) -m pip install -e ".[dev]"
-	$(PYTHON) -m pip install -e algo
-	$(PYTHON) -m pip install -e backend
-	$(PYTHON) -m pip install -e models
-	$(PYTHON) -m pip install -e edge/python
-	$(PYTHON) -m pip install -e notify
-	$(PNPM) install
+docx: assemble
+	$(PY) $(BUILD_DIR)/render_docx.py
 
-dev:                     ## docker-compose 启动本地全栈
-	docker compose -f infra/docker-compose.yml up -d
+pdf: assemble
+	$(PY) $(BUILD_DIR)/render_pdf.py
 
-down:                    ## 关闭本地全栈
-	docker compose -f infra/docker-compose.yml down
+all: models assemble docx pdf
 
-test:                    ## 单元测试 + 覆盖率
-	$(PYTHON) -m pytest -q --cov
-
-lint:                    ## 代码风格检查
-	$(PYTHON) -m ruff check .
-	$(PYTHON) -m mypy algo backend models notify edge/python || true
-	$(PNPM) lint
-
-format:                  ## 自动格式化
-	$(PYTHON) -m ruff check --fix .
-	$(PYTHON) -m black .
-	$(PNPM) format
-
-models:                  ## 跑全部商业/技术模型，输出 outputs/
-	cd models && $(PYTHON) run_all.py
-
-bench:                   ## 算法基准复现
-	$(PYTHON) -m liveguard_algo.benchmarks.run_bench
-
-seed:                    ## 数据库种子数据
-	$(PYTHON) -m backend.scripts.seed
-
-clean:                   ## 清理构建产物
-	find . -type d \( -name __pycache__ -o -name .pytest_cache -o -name .mypy_cache -o -name .ruff_cache \) -exec rm -rf {} +
-	rm -rf dist build htmlcov .coverage
-
-spec-status:             ## 显示 Kiro spec 任务进度
-	@$(PYTHON) tools/spec_status.py
+clean:
+	rm -rf $(MODELS_DIR)/outputs
+	rm -f docs/images/charts/*.png
+	rm -f ../守播LiveGuard_商业计划书_v2.0.docx ../守播LiveGuard_商业计划书_v2.0.pdf

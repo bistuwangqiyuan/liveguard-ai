@@ -2,73 +2,106 @@
 02_unit_economics.py
 ====================
 
-LTV / CAC / Payback / Rule of 40 — 蒙特卡洛。
+分客群单位经济：LTV / CAC / Payback / Rule of 40。对应 BP §5.4。
+三档（Starter/Pro/Enterprise）均以贡献毛利 78% 计，LTV = 月贡献毛利 / 月流失。
+蒙特卡洛 N=200,000，seed=42。常量来自 data_sources.py。
 
 ASSUMPTIONS
 -----------
-* ARPU 月 = ¥ 349（Starter 299 / Pro 1,299 加权）
-* Gross Margin = 72% (GPU/带宽/短信/电话成本按 BP §9 测算)
-* Monthly churn = 3.5%（行业中小 B SaaS 中位数）
-* Blended CAC:
-    - 直销 ¥2,400 / 单
-    - 自然/渠道 ¥480 / 单
-    - 混合 50/50 → ¥1,440
-* Expansion (NRR) = 1.12
-
-SOURCES
--------
-* SaaS Capital 2024 Benchmark Report (https://www.saascapital.com/)
-* OpenView 2024 SaaS Benchmarks
-* ChinaVenture 2024 中国 SaaS 调研报告
+* 贡献毛利率 = 78%（稳态；GPU/带宽/短信/电话成本按 §8 测算）
+* 月流失：Starter 5.0% / Pro 2.5% / Enterprise 0.8%
+* CAC：Starter ¥280 / Pro ¥850 / Enterprise ¥18,000
+SOURCES：SaaS Capital 2024 / OpenView 2024 / ChinaVenture 2024 SaaS 调研
 """
 
 from __future__ import annotations
 
 import numpy as np
+import matplotlib.pyplot as plt
 
-from _common import ci, fmt_cny, write_json
+from _common import BRAND, PALETTE, ci, fmt_cny, save_chart, write_json, N_SIM, rng
+import data_sources as DS
 
-rng = np.random.default_rng(7)
-N = 200_000
+r = rng()
+N = N_SIM
+CM = DS.SEGMENT_CONTRIB_MARGIN
 
-arpu_m = rng.triangular(280, 349, 520, N)       # CNY/月
-gross_margin = rng.triangular(0.65, 0.72, 0.78, N)
-monthly_churn = rng.triangular(0.022, 0.035, 0.055, N)
-nrr = rng.triangular(1.05, 1.12, 1.22, N)
-cac = rng.triangular(900, 1440, 2800, N)
+segments = {}
+for name, p in DS.PRICING.items():
+    monthly = p["monthly"]
+    churn0 = p["monthly_churn"]
+    cac0 = DS.CAC[name]
+    # MC：贡献毛利率、流失、CAC 三角扰动
+    cm = r.triangular(CM - 0.05, CM, CM + 0.04, N)
+    churn = r.triangular(churn0 * 0.8, churn0, churn0 * 1.3, N)
+    cac = r.triangular(cac0 * 0.8, cac0, cac0 * 1.4, N)
+    # 确定性基准（headline，与 BP 表对齐）
+    monthly_contrib_base = monthly * CM
+    ltv_base = monthly_contrib_base / churn0
+    cac_base = cac0
+    # 蒙特卡洛仅用于给出 90% 区间
+    monthly_contrib = monthly * cm
+    ltv = monthly_contrib / churn
+    ltv_cac = ltv / cac
+    segments[name] = {
+        "monthly_price_CNY": monthly,
+        "monthly_contribution_CNY": round(monthly_contrib_base, 0),
+        "monthly_churn_pct": round(churn0 * 100, 1),
+        "lifetime_months": round(1.0 / churn0, 0),
+        "CAC_CNY": round(cac_base, 0),
+        "LTV_CNY": round(ltv_base, 0),
+        "LTV_to_CAC": round(ltv_base / cac_base, 1),
+        "payback_months": round(cac_base / monthly_contrib_base, 1),
+        "LTV_to_CAC_90CI": [round(x, 1) for x in ci(ltv_cac)[1:]],
+    }
 
-# 简化 LTV：GM × ARPU_m / churn × NRR 上浮
-ltv = gross_margin * arpu_m * nrr / monthly_churn
-ltv_to_cac = ltv / cac
-payback_months = cac / (arpu_m * gross_margin)
-
-# Rule of 40：growth% + margin%
-growth_pct = rng.triangular(0.55, 0.90, 1.30, N) * 100  # Y1→Y2 同比（BP 假设）
-rule_of_40 = growth_pct + gross_margin * 100 - 20  # 扣 20% 为假定 OpEx 率
+# 混合（按客户结构加权）
+blended_churn = sum(DS.PRICING[s]["mix"] * DS.PRICING[s]["monthly_churn"] for s in DS.PRICING)
+blended_payback_by_year = []
+for cac_y in DS.CAC_BLENDED_BY_YEAR:
+    # 月贡献毛利（混合 ARPU/12 × 贡献毛利率）
+    monthly_contrib_blend = DS.BLENDED_ARPU_ANNUAL / 12 * CM
+    blended_payback_by_year.append(round(cac_y / monthly_contrib_blend, 1))
 
 payload = {
-    "ARPU_m_CNY": fmt_cny(float(np.median(arpu_m))),
-    "gross_margin_%": round(float(np.median(gross_margin)) * 100, 1),
-    "monthly_churn_%": round(float(np.median(monthly_churn)) * 100, 2),
-    "NRR": round(float(np.median(nrr)), 2),
-    "CAC_CNY": fmt_cny(float(np.median(cac))),
-    "LTV_CNY": fmt_cny(float(np.median(ltv))),
-    "LTV_to_CAC_median": round(float(np.median(ltv_to_cac)), 2),
-    "payback_months_median": round(float(np.median(payback_months)), 1),
-    "rule_of_40_median": round(float(np.median(rule_of_40)), 1),
-    "confidence_intervals": {
-        "LTV_90pct": [fmt_cny(x) for x in ci(ltv)[1:]],
-        "LTV_to_CAC_90pct": list(ci(ltv_to_cac))[1:],
-        "payback_months_90pct": list(ci(payback_months))[1:],
-    },
+    "as_of": DS.AS_OF, "currency": "CNY", "monte_carlo_n": int(N),
+    "contribution_margin_pct": round(CM * 100, 0),
+    "segments": segments,
+    "blended_monthly_churn_pct": round(blended_churn * 100, 2),
+    "blended_payback_months_by_year": blended_payback_by_year,
+    "sources": ["SaaS Capital 2024 Benchmark", "OpenView 2024 SaaS Benchmarks", "ChinaVenture 2024 中国 SaaS 调研"],
 }
 
-print("── Unit economics ──")
-print(f"  ARPU_m = {payload['ARPU_m_CNY']}  |  GM = {payload['gross_margin_%']}%  "
-      f"|  monthly churn = {payload['monthly_churn_%']}%  |  NRR = {payload['NRR']}x")
-print(f"  CAC  = {payload['CAC_CNY']}")
-print(f"  LTV  = {payload['LTV_CNY']}   LTV:CAC = {payload['LTV_to_CAC_median']}x")
-print(f"  Payback = {payload['payback_months_median']} months")
-print(f"  Rule-of-40 = {payload['rule_of_40_median']}")
+print("── 分客群单位经济（MC N=200k, seed=42）──")
+for s, v in segments.items():
+    print(f"  {s:<11s} LTV {fmt_cny(v['LTV_CNY']):>12s}  CAC {fmt_cny(v['CAC_CNY']):>9s}  "
+          f"LTV/CAC {v['LTV_to_CAC']:>5}x  Payback {v['payback_months']}月")
 
 write_json("02_unit_economics", payload)
+
+# ── 图：LTV/CAC 对比 + 分年 Payback ─────────────────────────────────────────
+fig, axs = plt.subplots(1, 2, figsize=(12.0, 4.6))
+names = list(segments.keys())
+ltv_cac = [segments[s]["LTV_to_CAC"] for s in names]
+bars = axs[0].bar(names, ltv_cac, color=[BRAND["blue"], BRAND["teal"], BRAND["violet"]], width=0.55, alpha=0.92)
+axs[0].axhline(3, color=BRAND["red"], ls="--", lw=1.2, label="健康线 3×")
+axs[0].axhline(5, color=BRAND["amber"], ls="--", lw=1.2, label="优秀线 5×")
+for i, v in enumerate(ltv_cac):
+    axs[0].text(i, v * 1.02, f"{v}×", ha="center", fontsize=11, fontweight="bold", color=BRAND["ink"])
+axs[0].set_ylabel("LTV / CAC")
+axs[0].set_title("分客群 LTV/CAC（远超优秀线）", pad=8)
+axs[0].legend(fontsize=9)
+
+axs[1].plot(DS.YEARS, blended_payback_by_year, "o-", color=BRAND["blue"], lw=2.2, markersize=9)
+for i, v in enumerate(blended_payback_by_year):
+    axs[1].annotate(f"{v}月", (i, v), xytext=(0, 8), textcoords="offset points", ha="center", fontsize=9, color=BRAND["ink"])
+axs[1].axhline(6, color=BRAND["red"], ls="--", lw=1.2, label="世界级 < 6 月")
+axs[1].set_ylabel("混合回本期 (月)")
+axs[1].set_title("分年混合 Payback", pad=8)
+axs[1].legend(fontsize=9)
+axs[1].set_ylim(0, max(blended_payback_by_year + [7]))
+fig.suptitle("§5.4 守播 LiveGuard 单位经济", fontsize=13, fontweight="bold", color=BRAND["ink"], y=1.02)
+fig.tight_layout()
+save_chart(fig, "fig_02_unit_economics")
+
+print("✓ 02_unit_economics 完成 → JSON + fig_02_unit_economics.png")

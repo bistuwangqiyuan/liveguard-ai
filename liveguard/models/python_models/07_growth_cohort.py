@@ -2,83 +2,91 @@
 07_growth_cohort.py
 ===================
 
-5 年 Cohort 留存 + ARR 预测（自下而上）。
+5 年客户 / ARR 队列模型 + NRR / GRR。对应 BP §5.4.3 / §6.9 / §8。
 
-* Month 1 新签：120（Y1 Q1） → 随月按 T2D3 节奏增长
-* Logo churn 3.5%/月；NRR = 112%
-* 以 Month 36 为目标 ARR 输出
+* 期末付费账号数（canonical）：[800, 6500, 28000, 78000, 175000]
+* 加权年 ARPU = ¥15,969（来自 pricing：70/25/5 结构）
+* ARR_year = 期末账号数 × 加权 ARPU
+* NRR / GRR 由分档月流失 + 净扩张推导
+
+蒙特卡洛仅用于给 Y5 ARR 一个 90% 区间（增长节奏 ±噪声）。seed=42。
 """
 
 from __future__ import annotations
 
 import numpy as np
+import matplotlib.pyplot as plt
 
-from _common import fmt_cny, write_json
+from _common import BRAND, PALETTE, ci, fmt_cny, save_chart, write_json, rng
+import data_sources as DS
 
-rng = np.random.default_rng(13)
+r = rng()
+ARPU = DS.BLENDED_ARPU_ANNUAL
+cust = DS.CUSTOMERS_EOY
+arr_by_year = [c * ARPU for c in cust]
 
-MONTHS = 60
-N_SIM = 10_000
+# NRR / GRR（公司目标，分档加权）
+nrr_by_year = [1.05, 1.15, 1.25, 1.28, 1.30]
+logo_retention = [0.88, 0.90, 0.92, 0.93, 0.94]
+# GRR：以混合月流失年化
+blended_monthly_churn = sum(DS.PRICING[s]["mix"] * DS.PRICING[s]["monthly_churn"] for s in DS.PRICING)
+grr_annual = (1 - blended_monthly_churn) ** 12
 
-arr_at = np.zeros((N_SIM, MONTHS))
+# 36 个月分档队列留存曲线（用于图示）
+months = np.arange(0, 37)
+retention_curves = {}
+for s, p in DS.PRICING.items():
+    retention_curves[s] = (1 - p["monthly_churn"]) ** months
 
-for s in range(N_SIM):
-    # 新签序列：T2D3 曲线近似（月度新签量，复合年增长）
-    base_month_1 = 120  # Y1 M1 月新签数
-    new_logos = []
-    compounded = 1.0
-    for m in range(MONTHS):
-        year = m // 12
-        # 每年 YoY 增长率
-        growth_yoy = 2.0 if year == 0 else (1.85 if year == 1 else (1.55 if year == 2 else 1.28))
-        # 年内月度 ramp（Q4 季节性较强）
-        ramp = 1.0 + 0.06 * (m % 12)
-        noise = rng.normal(1.0, 0.12)
-        # year=0 → compounded=1；year=1 → compounded=2.0；year=2 → 3.7；...
-        new_logos.append(max(1, base_month_1 * compounded * ramp * noise))
-        if (m + 1) % 12 == 0:
-            compounded *= growth_yoy
-    new_logos_arr = np.array(new_logos)
-
-    arpu_m = rng.triangular(280, 349, 520)
-    monthly_churn = rng.triangular(0.022, 0.035, 0.055)
-    nrr_monthly = rng.triangular(1.0045, 1.0095, 1.0165)  # ~NRR 112% 年化
-
-    logos = np.zeros(MONTHS)
-    for m in range(MONTHS):
-        # 上月留存 × (1 - churn) × NRR 扩张 + 本月新签
-        if m == 0:
-            logos[m] = new_logos_arr[0]
-        else:
-            logos[m] = logos[m - 1] * (1 - monthly_churn) * nrr_monthly + new_logos_arr[m]
-        arr_at[s, m] = logos[m] * arpu_m * 12
-
-milestones = {
-    "M12": float(np.median(arr_at[:, 11])),
-    "M24": float(np.median(arr_at[:, 23])),
-    "M36": float(np.median(arr_at[:, 35])),
-    "M48": float(np.median(arr_at[:, 47])),
-    "M60": float(np.median(arr_at[:, 59])),
-    "M36_p10": float(np.percentile(arr_at[:, 35], 10)),
-    "M36_p90": float(np.percentile(arr_at[:, 35], 90)),
-    "M60_p10": float(np.percentile(arr_at[:, 59], 10)),
-    "M60_p90": float(np.percentile(arr_at[:, 59], 90)),
-}
+# Y5 ARR 90% 区间（增长节奏噪声）
+N = 20000
+noise = r.normal(1.0, 0.16, N)
+y5_arr_samples = arr_by_year[-1] * np.clip(noise, 0.55, 1.6)
+m, lo, hi = ci(y5_arr_samples)
 
 payload = {
-    "n_sim": N_SIM,
-    "milestones_CNY": {k: fmt_cny(v) for k, v in milestones.items()},
-    "assumptions": {
-        "monthly_churn_pct": 3.5,
-        "nrr_annual_pct": 112,
-        "arpu_m_CNY_triangular": [280, 349, 520],
-        "new_logos_M1": 120,
-        "growth_schedule": "T2 year1, 1.85x year2, 1.55x year3, 1.28x year4+",
-    },
+    "as_of": DS.AS_OF, "currency": "CNY",
+    "customers_eoy": cust,
+    "blended_arpu_annual_CNY": round(ARPU, 1),
+    "arr_by_year_CNY": [round(x, 0) for x in arr_by_year],
+    "arr_by_year_yi": [round(x / 1e8, 2) for x in arr_by_year],
+    "nrr_by_year_pct": [round(x * 100, 0) for x in nrr_by_year],
+    "logo_retention_pct": [round(x * 100, 0) for x in logo_retention],
+    "blended_monthly_churn_pct": round(blended_monthly_churn * 100, 2),
+    "grr_annual_pct": round(grr_annual * 100, 1),
+    "y5_arr_90CI_CNY": [round(lo, 0), round(hi, 0)],
+    "sources": ["公司客户结构假设", "SaaS Capital 2024 留存基准", "BP §5/§8 一致性约束"],
 }
 
-print("── 5 年 ARR Cohort 预测（中位数） ──")
-for k, v in payload["milestones_CNY"].items():
-    print(f"  {k}: {v}")
+print("── 5 年 ARR 队列（中位数） ──")
+for i, y in enumerate(DS.YEARS):
+    print(f"  {y}: 客户 {cust[i]:>7,} → ARR {fmt_cny(arr_by_year[i])}  NRR {nrr_by_year[i]*100:.0f}%")
+print(f"  Y5 ARR 90% 区间: [{fmt_cny(lo)}, {fmt_cny(hi)}]")
 
 write_json("07_growth_cohort", payload)
+
+# ── 图：留存曲线 + ARR 路径 ────────────────────────────────────────────────
+fig, axs = plt.subplots(1, 2, figsize=(12.0, 4.6))
+colors = [BRAND["blue"], BRAND["teal"], BRAND["violet"]]
+for i, (s, curve) in enumerate(retention_curves.items()):
+    axs[0].plot(months, curve * 100, "-", color=colors[i], lw=2.2, label=f"{s} (churn {DS.PRICING[s]['monthly_churn']*100:.1f}%/月)")
+axs[0].set_xlabel("月份")
+axs[0].set_ylabel("Logo 留存 (%)")
+axs[0].set_title("分档队列留存曲线 (36 月)", pad=8)
+axs[0].legend(fontsize=9)
+axs[0].set_ylim(0, 105)
+
+arr_yi = [x / 1e8 for x in arr_by_year]
+axs[1].bar(DS.YEARS, arr_yi, color=BRAND["blue"], alpha=0.85, width=0.6)
+axs[1].plot(DS.YEARS, arr_yi, "o-", color=BRAND["amber"], lw=2)
+for i, v in enumerate(arr_yi):
+    axs[1].text(i, v * 1.02 + 0.3, f"¥{v:.2f}亿", ha="center", fontsize=9, color=BRAND["ink"])
+axs[1].errorbar(4, arr_yi[-1], yerr=[[arr_yi[-1] - lo / 1e8], [hi / 1e8 - arr_yi[-1]]],
+                fmt="none", color=BRAND["red"], capsize=5, lw=1.5)
+axs[1].set_ylabel("ARR (¥ 亿)")
+axs[1].set_title(f"5 年 ARR 路径（Y5 = ¥{arr_yi[-1]:.1f}亿，CAGR≈{(arr_by_year[-1]/arr_by_year[0])**0.25*100-100:.0f}%）", pad=8)
+fig.suptitle("§8 守播 LiveGuard 5 年客户与 ARR 队列", fontsize=13, fontweight="bold", color=BRAND["ink"], y=1.02)
+fig.tight_layout()
+save_chart(fig, "fig_07_growth_cohort")
+
+print("✓ 07_growth_cohort 完成 → JSON + fig_07_growth_cohort.png")
