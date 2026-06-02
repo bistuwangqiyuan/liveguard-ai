@@ -24,7 +24,8 @@ Y = DS.YEARS
 n = len(Y)
 ARPU = DS.BLENDED_ARPU_ANNUAL
 
-rev = np.array([c * ARPU for c in DS.CUSTOMERS_EOY])
+# v3：收入采用四层货币化口径（核心监控 SaaS × 分层乘数），唯一可信源 = data_sources
+rev = np.array(DS.REVENUE_BY_YEAR_CNY)
 gm = np.array(DS.GROSS_MARGIN)
 cogs = rev * (1 - gm)
 gross = rev * gm
@@ -58,13 +59,10 @@ d_wc = np.diff(wc, prepend=0.0)
 
 cfo = net + da - d_wc
 cfi = -capex
-financing = np.array([
-    DS.ROUNDS["Seed"]["amount"] + DS.ROUNDS["Pre-A"]["amount"],  # Y1
-    DS.ROUNDS["A"]["amount"],                                    # Y2
-    DS.ROUNDS["B"]["amount"],                                    # Y3
-    0.0,                                                         # Y4
-    DS.ROUNDS["C"]["amount"],                                    # Y5
-], dtype=float)
+# v3：融资以天使轮为第一性视角（Angel+Seed 计入 Y1；A→Y2；B→Y3；C→Y5）
+financing = np.zeros(n)
+for rname, ridx in DS.ROUND_YEAR_INDEX.items():
+    financing[ridx] += DS.ROUNDS[rname]["amount"]
 cff = financing
 net_cash = cfo + cfi + cff
 cash = np.cumsum(net_cash)

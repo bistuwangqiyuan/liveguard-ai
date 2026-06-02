@@ -49,9 +49,14 @@ sam_bottomup = tam_bottomup * r.triangular(0.78, 0.86, 0.92, N)
 tam_consensus = (tam_topdown + tam_bottomup) / 2.0
 sam_consensus = (sam_topdown + sam_bottomup) / 2.0
 
-# ── SOM 5 年路径（与财务模型一致：客户数 × 加权 ARPU）─────────────────────────
+# ── v3：多层货币化 TAM 放大（核心监控 + 风控 OS + 数据网络/API + 保险/RegTech）──────
+LAYER_MULT_TOTAL = sum(DS.TAM_LAYER_MULTIPLIER.values())   # ≈ 3.80×
+tam_layered = tam_consensus * LAYER_MULT_TOTAL
+sam_layered = sam_consensus * LAYER_MULT_TOTAL
+
+# ── SOM 5 年路径（与财务模型一致：四层货币化总收入 REVENUE_BY_YEAR）──────────────
 arpu_blend = DS.BLENDED_ARPU_ANNUAL
-som_by_year = {y: DS.CUSTOMERS_EOY[i] * arpu_blend for i, y in enumerate(DS.YEARS)}
+som_by_year = {y: DS.REVENUE_BY_YEAR_CNY[i] for i, y in enumerate(DS.YEARS)}
 som_y5 = som_by_year["Y5"]
 
 
@@ -68,9 +73,14 @@ result = {
     "TAM_bottomup_CNY": stat(tam_bottomup),
     "TAM_consensus_CNY": stat(tam_consensus),
     "SAM_consensus_CNY": stat(sam_consensus),
+    "TAM_layered_total_CNY": stat(tam_layered),
+    "SAM_layered_total_CNY": stat(sam_layered),
+    "layer_multiplier_total": round(LAYER_MULT_TOTAL, 2),
+    "layer_multiplier_detail": DS.TAM_LAYER_MULTIPLIER,
     "SOM_by_year_CNY": som_by_year,
     "SOM_year5_CNY": float(som_y5),
-    "som_y5_share_of_sam_pct": round(som_y5 / float(np.median(sam_consensus)) * 100, 1),
+    "som_y5_share_of_monitor_sam_pct": round(som_y5 / float(np.median(sam_consensus)) * 100, 1),
+    "som_y5_share_of_layered_sam_pct": round(som_y5 / float(np.median(sam_layered)) * 100, 1),
     "topdown_vs_bottomup_diff_pct": round(float(diff_tam) * 100, 1),
     "blended_arpu_annual_CNY": round(arpu_blend, 1),
     "assumptions": {
@@ -86,9 +96,11 @@ result = {
 print("── 守播 LiveGuard · TAM / SAM / SOM (MC N=200k, seed=42) ──")
 print(f"  TAM 自上而下 : {fmt_cny(result['TAM_topdown_CNY']['median'])}")
 print(f"  TAM 自下而上 : {fmt_cny(result['TAM_bottomup_CNY']['median'])}")
-print(f"  TAM 共识     : {fmt_cny(result['TAM_consensus_CNY']['median'])}  双向差异 {result['topdown_vs_bottomup_diff_pct']}%")
-print(f"  SAM 共识     : {fmt_cny(result['SAM_consensus_CNY']['median'])}")
-print(f"  SOM Y5       : {fmt_cny(som_y5)}  (= SAM 的 {result['som_y5_share_of_sam_pct']}%)")
+print(f"  TAM 共识(监控): {fmt_cny(result['TAM_consensus_CNY']['median'])}  双向差异 {result['topdown_vs_bottomup_diff_pct']}%")
+print(f"  SAM 共识(监控): {fmt_cny(result['SAM_consensus_CNY']['median'])}")
+print(f"  TAM 多层放大 : {fmt_cny(result['TAM_layered_total_CNY']['median'])}  (×{LAYER_MULT_TOTAL:.2f} 四层货币化)")
+print(f"  SAM 多层放大 : {fmt_cny(result['SAM_layered_total_CNY']['median'])}")
+print(f"  SOM Y5       : {fmt_cny(som_y5)}  (= 监控SAM {result['som_y5_share_of_monitor_sam_pct']}% / 多层SAM {result['som_y5_share_of_layered_sam_pct']}%)")
 
 write_json("01_market_sizing", result)
 

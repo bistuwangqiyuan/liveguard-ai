@@ -96,11 +96,13 @@ ev_drivers.sort(key=lambda d: d["range_pp"], reverse=True)
 
 payload = {
     "as_of": DS.AS_OF,
-    "base_y5_revenue_yi": round(base_rev / 1e8, 2),
+    "base_y5_core_saas_revenue_yi": round(base_rev / 1e8, 2),
+    "base_y5_total_revenue_yi": round(DS.REVENUE_BY_YEAR_CNY[-1] / 1e8, 2),
     "base_ev_yi": round(base_ev / 1e8, 1),
+    "revenue_tornado_note": "收入龙卷风针对【核心监控 SaaS 层】定价/结构驱动；扩展层见 20_business_model_layers。",
     "revenue_tornado": rev_drivers,
     "ev_tornado": ev_drivers,
-    "sources": ["逐参数重算敏感性", "BP §8.5"],
+    "sources": ["逐参数重算敏感性", "BP §10"],
 }
 
 print("── Y5 收入敏感性 ──")
@@ -131,9 +133,9 @@ def tornado(ax, drivers, title):
 
 
 fig, axs = plt.subplots(1, 2, figsize=(13.0, 4.8))
-tornado(axs[0], rev_drivers, f"Y5 收入敏感性（基准 ¥{base_rev/1e8:.1f}亿）")
+tornado(axs[0], rev_drivers, f"核心 SaaS 收入敏感性（基准 ¥{base_rev/1e8:.1f}亿）")
 tornado(axs[1], ev_drivers, f"企业价值 EV 敏感性（基准 ¥{base_ev/1e8:.0f}亿）")
-fig.suptitle("§8.5 龙卷风敏感性分析", fontsize=13, fontweight="bold", color=BRAND["ink"], y=1.02)
+fig.suptitle("§10 龙卷风敏感性分析", fontsize=13, fontweight="bold", color=BRAND["ink"], y=1.02)
 fig.tight_layout()
 save_chart(fig, "fig_15_sensitivity_tornado")
 

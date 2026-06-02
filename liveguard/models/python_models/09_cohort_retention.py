@@ -30,8 +30,8 @@ total_w = sum(rev_weight.values())
 blended_gross_churn = sum(rev_weight[s] / total_w * seg_annual_gross_churn[s] for s in DS.PRICING)
 grr_amount = 1 - blended_gross_churn
 
-# 净扩张（公司目标，逐年提升）
-expansion_by_year = [0.10, 0.22, 0.36, 0.40, 0.44]   # Pro/Ent 升级 + 加路 + Starter→Pro
+# 净扩张（v3 四层货币化驱动：Pro/Ent 升级 + 加路 + 风控OS加购 + 数据/API + 保险/RegTech）
+expansion_by_year = [0.12, 0.25, 0.40, 0.50, 0.60]
 nrr_by_year = [round(grr_amount + e, 4) for e in expansion_by_year]
 grr_by_year = [round(grr_amount, 4)] * 5
 

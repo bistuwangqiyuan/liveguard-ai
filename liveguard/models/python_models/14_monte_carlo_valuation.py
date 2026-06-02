@@ -83,7 +83,7 @@ payload = {
     "as_of": DS.AS_OF, "currency": "CNY", "monte_carlo_n": int(N),
     "mc_quantiles_yi": quantiles, "mc_mean_yi": mc_mean_yi,
     "weighted_methods": methods, "weighted_EV_yi": weighted_ev_yi,
-    "investor_range_yi": [110, 160],
+    "investor_range_yi": [150, 260],
     "c_round_post_money_yi": round(DS.ROUNDS["C"]["post_money"] / 1e8, 0),
     "sources": ["蒙特卡洛 N=200k seed=42", "DCF + 可比综合加权"],
 }
@@ -92,7 +92,8 @@ print("── 蒙特卡洛估值（N=200k）──")
 for k, v in quantiles.items():
     print(f"  {k}: ¥{v}亿")
 print(f"  均值: ¥{mc_mean_yi}亿")
-print(f"  加权综合 EV = ¥{weighted_ev_yi}亿 （投资人区间 110-160 亿；C 轮 Post 80 亿留上行空间）")
+c_post_yi = DS.ROUNDS["C"]["post_money"] / 1e8
+print(f"  加权综合 EV = ¥{weighted_ev_yi}亿 （投资人区间 150-260 亿；C 轮 Post ¥{c_post_yi:.0f}亿留上行空间）")
 
 write_json("14_monte_carlo_valuation", payload)
 
@@ -114,7 +115,7 @@ mcolors = [BRAND["amber"], BRAND["grey"], BRAND["teal"], BRAND["violet"], BRAND[
 axs[1].barh(mnames, mvals, color=mcolors, alpha=0.9)
 for i, v in enumerate(mvals):
     axs[1].text(v + 2, i, f"¥{v:.0f}亿", va="center", fontsize=9, color=BRAND["ink"])
-axs[1].axvline(80, color=BRAND["ink"], ls=":", lw=1.5, label="C 轮 Post ¥80亿")
+axs[1].axvline(DS.ROUNDS["C"]["post_money"] / 1e8, color=BRAND["ink"], ls=":", lw=1.5, label=f"C 轮 Post ¥{DS.ROUNDS['C']['post_money']/1e8:.0f}亿")
 axs[1].set_xlabel("EV (¥ 亿)")
 axs[1].set_title(f"多模型加权 → ¥{weighted_ev_yi:.0f}亿", pad=8)
 axs[1].legend(fontsize=9)
