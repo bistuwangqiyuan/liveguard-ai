@@ -18,4 +18,4 @@ all: models assemble docx
 clean:
 	rm -rf $(MODELS_DIR)/outputs
 	rm -f docs/images/charts/*.png
-	rm -f ../守播LiveGuard_商业计划书_v4.0.docx ../守播LiveGuard_商业计划书_v4.0.md
+	rm -f ../守播LiveGuard_商业计划书_v5.0.docx ../守播LiveGuard_商业计划书_v5.0.md

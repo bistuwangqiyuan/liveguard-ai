@@ -1,8 +1,8 @@
 """
-run_all.py  ·  守播 LiveGuard v4.0
+run_all.py  ·  守播 LiveGuard v5.0
 ==================================
 
-一键运行全部 21 个模型，按依赖顺序执行，汇总 headline 到 outputs/summary.json。
+一键运行全部 19 个模型，按依赖顺序执行，汇总 headline 到 outputs/summary.json。
 
 用法：
     cd liveguard/models/python_models
@@ -40,8 +40,6 @@ ORDER = [
     "17_resource_requirements.py",
     "18_angel_returns.py",
     "19_success_probability.py",
-    "20_business_model_layers.py",
-    "21_personal_kelly_founder.py",
 ]
 
 
@@ -67,51 +65,43 @@ def main() -> int:
     dcf = load("12_valuation_dcf")
     mc = load("14_monte_carlo_valuation")
     res = load("17_resource_requirements")
-    angel = load("18_angel_returns")
+    lead = load("18_angel_returns")
     succ = load("19_success_probability")
-    layers = load("20_business_model_layers")
-    kelly = load("21_personal_kelly_founder")
 
     summary = {
         "generated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
-        "version": "4.0", "models_run": len(ORDER), "failed": failed,
+        "version": "5.0", "models_run": len(ORDER), "failed": failed,
         "headline": {
-            # —— 创始人王启源（v4 第一指标）——
-            "founder_p_win_pct": kelly.get("win_rate_p_pct"),
-            "founder_pnl_ratio_b": kelly.get("pnl_ratio_b"),
-            "founder_kelly_full_f": kelly.get("kelly_full_f"),
-            "founder_kelly_recommended_f": kelly.get("kelly_recommended_f"),
-            "founder_recommended_commitment_wan": kelly.get("recommended_commitment_wan"),
-            "founder_expected_net_return_wan": kelly.get("expected_net_return_wan"),
-            "founder_median_moic": kelly.get("median_MOIC"),
-            "founder_p_total_loss_pct": kelly.get("p_total_loss_pct"),
-            "founder_p_success_exit_pct": kelly.get("p_success_exit_pct"),
-            "founder_action_label": kelly.get("action_label"),
-            "wang_combined_after_C_pct": fund.get("wang_combined_after_C_pct"),
-            # —— 天使 IRR ——
-            "angel_invest_yi": round(angel.get("angel_invest_CNY", 0) / 1e8, 2) if angel else None,
-            "angel_final_stake_pct": angel.get("angel_final_stake_pct"),
-            "angel_expected_MOIC": succ.get("expected_MOIC"),
-            "angel_expected_IRR_5y_pct": succ.get("expected_IRR_5y_pct"),
-            "p_success_exit_pct": succ.get("p_success_exit_pct"),
-            "p_total_loss_pct": succ.get("p_total_loss_pct"),
-            "angel_conditional_success_MOIC": succ.get("conditional_success_MOIC"),
-            "angel_paper_mark_MOIC_at_C": angel.get("paper_mark_at_C", {}).get("MOIC"),
-            # —— 资源 / 融资 ——
-            "derived_angel_round_yi": round(res.get("angel_stage", {}).get("derived_angel_need_CNY", 0) / 1e8, 2) if res else None,
-            "total_raised_yi": round(fund.get("total_raised_CNY", 0) / 1e8, 2) if fund else None,
-            "founders_after_C_pct": fund.get("founders_after_C_pct"),
-            # —— 市场 / 财务 / 估值 ——
-            "TAM_layered_yi": round(mkt.get("TAM_layered_total_CNY", {}).get("median", 0) / 1e8, 1) if mkt else None,
+            # —— 市场（单层监控）——
+            "TAM_monitor_consensus_yi": round(mkt.get("TAM_consensus_CNY", {}).get("median", 0) / 1e8, 1) if mkt else None,
+            "SAM_monitor_consensus_yi": round(mkt.get("SAM_consensus_CNY", {}).get("median", 0) / 1e8, 1) if mkt else None,
+            "SOM_Y5_yi": round(mkt.get("SOM_year5_CNY", 0) / 1e8, 2) if mkt else None,
+            # —— 财务 ——
             "Y5_revenue_yi": fin.get("headline", {}).get("Y5_revenue_yi"),
-            "Y5_expansion_share_pct": layers.get("headline", {}).get("Y5_expansion_share_pct"),
             "Y5_ebitda_yi": fin.get("headline", {}).get("Y5_ebitda_yi"),
             "Y5_net_yi": fin.get("headline", {}).get("Y5_net_yi"),
             "Y5_rule_of_40": fin.get("headline", {}).get("Y5_rule_of_40"),
             "balance_sheet_max_recon_gap_CNY": fin.get("headline", {}).get("max_recon_gap_CNY"),
+            # —— 融资 / 资源 ——
+            "derived_seed_round_yi": round(res.get("angel_stage", {}).get("derived_seed_need_CNY", 0) / 1e8, 2) if res else None,
+            "total_raised_yi": round(fund.get("total_raised_CNY", 0) / 1e8, 2) if fund else None,
+            "founders_after_C_pct": fund.get("founders_after_C_pct"),
+            # —— 估值（2026 压缩倍数）——
             "EV_dcf_two_stage_yi": dcf.get("EV_two_stage_yi"),
             "EV_weighted_yi": mc.get("weighted_EV_yi"),
             "C_round_post_money_yi": mc.get("c_round_post_money_yi"),
+            # —— 成功概率与回报（多口径，保守）——
+            "lead_round": succ.get("lead_round"),
+            "lead_invest_yi": round(lead.get("lead_invest_CNY", 0) / 1e8, 2) if lead else None,
+            "lead_final_stake_pct": lead.get("lead_final_stake_pct"),
+            "p_success_exit_pct": succ.get("p_success_exit_pct"),
+            "p_total_loss_pct": succ.get("p_total_loss_pct"),
+            "median_MOIC": succ.get("median_MOIC"),
+            "expected_MOIC": succ.get("expected_MOIC"),
+            "expected_IRR_path_pct": succ.get("expected_IRR_path_pct"),
+            "conditional_success_MOIC": succ.get("conditional_success_MOIC"),
+            "conditional_success_IRR_pct": succ.get("conditional_success_IRR_pct"),
+            "irr_path_P90_pct": succ.get("irr_path_quantiles_pct", {}).get("P90"),
         },
     }
     (OUT / "summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")

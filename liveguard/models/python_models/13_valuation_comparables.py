@@ -6,7 +6,7 @@
 读取 10_financial_projections.json 的 Y5 收入与 EBITDA。
 
 12 家可比池：商汤、旷视、依图、Verint、NICE、Asana、Monday、Sprinklr、微盟、有赞、Salesforce、Datadog。
-数据来源：S&P Capital IQ / Bloomberg / 公司年报（截止 2024 年报）。
+数据来源：S&P Capital IQ / Bloomberg / 公司财报（2026 Q1 口径，倍数已较 2021 峰值大幅压缩）[S-111][S-112]。
 """
 
 from __future__ import annotations
@@ -31,10 +31,10 @@ ev_sales = {k: round(rev_y5 * v, 0) for k, v in evs.items()}
 ev_ebitda = {k: round(ebitda_y5 * v, 0) for k, v in eve.items()}
 
 comps = {
-    "商汤": {"evs": 4.2}, "旷视": {"evs": 3.6}, "依图": {"evs": 3.1},
-    "Verint": {"evs": 3.4}, "NICE": {"evs": 6.8}, "Asana": {"evs": 5.1},
-    "Monday": {"evs": 9.2}, "Sprinklr": {"evs": 4.4}, "微盟": {"evs": 3.0},
-    "有赞": {"evs": 2.6}, "Salesforce": {"evs": 6.6}, "Datadog": {"evs": 14.0},
+    "商汤": {"evs": 3.8}, "旷视": {"evs": 3.0}, "依图": {"evs": 2.7},
+    "Verint": {"evs": 2.9}, "NICE": {"evs": 5.2}, "Asana": {"evs": 3.6},
+    "Monday": {"evs": 7.0}, "Sprinklr": {"evs": 3.2}, "微盟": {"evs": 2.4},
+    "有赞": {"evs": 2.2}, "Salesforce": {"evs": 5.8}, "Datadog": {"evs": 10.5},
 }
 
 payload = {
@@ -45,13 +45,13 @@ payload = {
     "EV_EBITDA_multiples": eve,
     "EV_EBITDA_valuation_yi": {k: round(v / 1e8, 0) for k, v in ev_ebitda.items()},
     "comparables": comps,
-    "sources": ["S&P Capital IQ", "Bloomberg", "可比公司 2024 年报", "Bessemer Cloud Index 2024"],
+    "sources": ["S&P Capital IQ", "Bloomberg", "可比公司 2026Q1 财报", DS.SOURCES["S-111"], DS.SOURCES["S-112"]],
 }
 
 print("── 可比公司估值 ──")
 print(f"  Y5 收入 {fmt_cny(rev_y5)} · EBITDA {fmt_cny(ebitda_y5)}")
-print(f"  EV/Sales  (3.4/4.6/6.6×) → {ev_sales['p25']/1e8:.0f}/{ev_sales['median']/1e8:.0f}/{ev_sales['p75']/1e8:.0f} 亿")
-print(f"  EV/EBITDA (18/25/36×)    → {ev_ebitda['p25']/1e8:.0f}/{ev_ebitda['median']/1e8:.0f}/{ev_ebitda['p75']/1e8:.0f} 亿")
+print(f"  EV/Sales  ({evs['p25']}/{evs['median']}/{evs['p75']}×) → {ev_sales['p25']/1e8:.0f}/{ev_sales['median']/1e8:.0f}/{ev_sales['p75']/1e8:.0f} 亿")
+print(f"  EV/EBITDA ({eve['p25']}/{eve['median']}/{eve['p75']}×)    → {ev_ebitda['p25']/1e8:.0f}/{ev_ebitda['median']/1e8:.0f}/{ev_ebitda['p75']/1e8:.0f} 亿")
 
 write_json("13_valuation_comparables", payload)
 

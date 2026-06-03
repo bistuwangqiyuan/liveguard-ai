@@ -1,6 +1,6 @@
 """
-data_sources.py  ·  守播 LiveGuard 商业计划书 v4.0
-====================================================
+data_sources.py  ·  守播 LiveGuard 商业计划书 v5.0（完全重构）
+================================================================
 
 全部关键假设与常量的【唯一可信源】（Single Source of Truth）。
 
@@ -8,275 +8,217 @@ data_sources.py  ·  守播 LiveGuard 商业计划书 v4.0
 models/python_models/*.py 计算得出。修改此处任一参数 → 重跑 run_all.py →
 全部模型 JSON 与图表自动重算，BP 数字随之更新。
 
-v3.0 相对 v2.0 的结构性升级（天使 IRR 优先 + 商业模式重构）：
-  1. 商业模式从"离岗监控功能"升级为"直播经济实时可信与风控中台"——四层货币化：
-     ① 核心监控 SaaS ② 风控 OS 加购 ③ 可信数据网络 / API-PaaS ④ 合规履约保险分润 / RegTech。
-     收入口径由 REVENUE_BY_YEAR_CNY 统一给出（核心 SaaS × 分层乘数）。
-  2. 融资以【天使轮 Angel】为第一性视角：Angel → Seed → A → B → C，天使 5 年 IRR 为全篇头条指标。
-  3. 新增"创立所需资源"自底向上口径（团队 / 算力 / 数据标注 / 资质牌照 / 平台 / 资本），
-     由资源需求倒推天使轮规模，不再预设投入上限。
-  4. 新增"阶段闸门生存模型"参数，用于评估项目成功概率与天使期望收益。
-
-v4.0 相对 v3.0 的结构性升级（创始人凯利仓位 + Pre-Angel）：
-  5. 王启源个人经济账户：500 万现金 + 5×100 万时间机会成本 = 1000 万 bankroll。
-  6. Pre-Angel 自投 500 万计入 Cap Table 稀释（仍引入外部 Angel→C）。
-  7. 课余轻量创始（15–20h/周）阶段晋级概率折扣 → STAGE_GATES_FOUNDER。
-  8. 凯利公式最优个人仓位（21_personal_kelly_founder.py）。
+v5.0 完全重构（聚焦"AI 直播监控 SaaS"本体 · 机构标准 BP · 保守口径）：
+  1. 定位回归：核心产品 = 直播间"离岗 / 替身 / 挂播 / 合规"实时监控 SaaS，
+     面向机构投资人的标准商业计划书。四层扩展（风控 OS / 数据网络 / 保险）仅作"增长期上行"附注，
+     不再作为 TAM / 收入主口径（移除 v4 的 ×3.8 货币化乘数主用法）。
+  2. 2026 实时调研重置市场数据：2025 直播电商 GMV、职业主播、监管催化剂（令第117号）。
+  3. 估值倍数全面保守化（贴合 2026 已大幅压缩的 SaaS 二级市场）。
+  4. 阶段闸门概率贴近 2026 真实晋级率（Seed→A 已从历史 30–40% 跌至 15–24%）。
+  5. 回报披露改为【多口径并列】：中位 / 概率加权期望 / 条件于成功 / 逐路径 IRR 分位，
+     杜绝用 E[MOIC]^(1/5)−1 单点夸大（见 19_success_and_returns.py）。
+  6. 移除 v4 的"创始人个人凯利仓位 / Pre-Angel"——机构 BP 不以个人资金账户为头条。
 
 每条参数标注来源编号 [S-xxx]，对应 BP 附录 A 数据源清单。
-口径基准日：2026-06-01。立场：保守取可公开验证区间中值；激进目标作为"主案 + 上行情景"明示。
+口径基准日：2026-06-01。立场：主案取可公开验证区间的保守下沿；高口径仅作"上行情景"明示。
 """
 
 from __future__ import annotations
 
-VERSION = "4.0"
+VERSION = "5.0"
 AS_OF = "2026-06-01"
 CURRENCY = "CNY"
 SEED = 42
 N_SIM = 200_000
 
 # ───────────────────────────────────────────────────────────────────────────
-# 1. 行业宏观（直播电商 / 主播 / MCN）
+# 1. 行业宏观（直播电商 / 主播 / 监管）—— 2026 实时调研
 # ───────────────────────────────────────────────────────────────────────────
+# 2025 GMV 多口径：官方《2025 直播电商行业发展白皮书》>5 万亿；华经产业研究院 5.26 万亿(+16.5%)；
+# 网经社"电数宝" 6.95 万亿(+30.4%)。主案取保守中低口径，网经社高口径仅作上行情景。[S-101][S-102][S-103]
 CHINA_LIVE_GMV_TRILLION = {
-    2020: 1.05, 2021: 2.36, 2022: 3.50, 2023: 4.50, 2024: 5.30,
-    2025: 5.99, 2026: 6.77, 2027: 7.65, 2028: 8.65, 2029: 9.77,
-}  # [S-001][S-002][S-018]
-CHINA_LIVE_GMV_CAGR_5Y = 0.13          # [S-002][S-020]
-GLOBAL_LIVE_GMV_CAGR_5Y = 0.205        # [S-018][S-019]
+    2021: 2.36, 2022: 3.50, 2023: 4.51, 2024: 5.26, 2025: 5.92,
+    2026: 6.63, 2027: 7.36, 2028: 8.10, 2029: 8.83,
+}  # 2025 取保守口径 5.92（华经 5.26 与白皮书>5 之上、网经社 6.95 之下）；主案 CAGR≈12%
+CHINA_LIVE_GMV_CAGR_5Y = 0.12          # 2024→2029 保守主案（艾瑞 18% / 华经 16.5% 之下沿）[S-102][S-104]
+CHINA_LIVE_GMV_UPSIDE_2025 = 6.95      # 网经社"电数宝"上行口径（+30.4%）[S-103]
+LIVE_PENETRATION_2025 = 0.329          # 直播电商渗透率（占网络零售）[S-104]
+LIVE_USERS_2025_YI = 6.6               # 直播电商用户规模（亿人）[S-103]
 
-ACTIVE_HOSTS_MILLION = 17.8
-PRO_HOSTS_MILLION = 1.78               # 职业主播 178 万 [S-005]
-MERCHANT_SELF_BROADCAST_MILLION = 1.60  # 品牌/商家自播账号 160 万 [S-002]
-MCN_COUNT = 42_000                      # MCN 机构数 [S-008]
+# 主播 / 商户 / 行业主体（2024 末口径，2026 报告沿用）
+PRO_HOSTS_MILLION = 38.8               # 职业主播 3880 万（含泛职业）[S-105]
+CORE_PRO_HOSTS_MILLION = 5.0           # 其中"以直播为主业、有付费监控意愿"的核心职业主播（保守估计）[内部测算]
+MERCHANT_SELF_BROADCAST_MILLION = 2.0  # 品牌/商家自播间（店播 GMV 占比>50% 推动）[S-101]
+LIVE_RELATED_FIRMS_MILLION = 256.96    # 直播相关企业存量（万家）[S-101]
+LIVE_ECOM_FIRMS_2025_WAN = 118.66      # 2025 直播电商相关企业注册（万家，+32.2%）[S-104]
 
-# TAM 关键参数（核心监控层）
-TOOL_SPEND_RATIO_OF_GMV = 0.012        # 工具支出占 GMV 比例（中位）[S-015]
-MONITOR_SHARE_OF_TOOL_SPEND = 0.25     # 监控/合规类占工具支出 [内部测算]
-SAM_SHARE_OF_TAM = 0.86
-ADDRESSABLE_ACCOUNTS_MILLION = 2.49    # 50%×178万 + 160万 = 249 万
-
-# v3 新增：可信/风控层 + 数据-保险层的 TAM 放大系数（相对核心监控 TAM）
-#   监控层 = 1.00（基准）；风控 OS 层 ≈ 1.6×；数据网络/API ≈ 0.5×；保险/RegTech ≈ 0.7×
-TAM_LAYER_MULTIPLIER = {
-    "核心监控SaaS": 1.00,
-    "风控OS": 1.60,            # 话术/极限词/价格/商品/刷单造假风控，单价更高、覆盖更广
-    "数据网络/API": 0.50,      # 可信认证 + 欺诈名单 + 基准数据订阅 + 平台/ISV API 调用
-    "保险/RegTech": 0.70,      # 合规履约保险分润 + 监管/平台治理 RegTech
-}
+# 监管催化剂（核心 Why Now）
+REG_CATALYSTS = [
+    {"name": "《直播电商监督管理办法》", "doc": "市监总局+网信办令第117号",
+     "publish": "2025-12-18", "effective": "2026-02-01",
+     "note": "首部系统性部门规章；压实平台/直播间/营销人员/MCN 四类主体责任；"
+             "第17/34/44条明确禁止利用 AI 等技术编造、传播虚假或误导信息。", "tag": "S-106"},
+    {"name": "《互联网信息内容多渠道分发服务管理规定》", "doc": "网信办",
+     "publish": "2026", "effective": "2026-09-01",
+     "note": "MCN/分发机构依法备案 + 年度报送 + 严禁编造人设与流量造假。", "tag": "S-107"},
+    {"name": "《生成式人工智能服务管理暂行办法》/ 算法备案", "doc": "网信办等七部门",
+     "publish": "2023-07", "effective": "2023-08-15",
+     "note": "具备舆论属性或社会动员能力的算法须备案；监控类 AI 须落实安全评估。", "tag": "S-108"},
+]
 
 # ───────────────────────────────────────────────────────────────────────────
-# 2. 定价（唯一可信定价方案）—— 核心监控 SaaS：Starter/Pro/Enterprise
+# 1b. TAM 关键参数（单层监控口径为主口径）
+# ───────────────────────────────────────────────────────────────────────────
+TOOL_SPEND_RATIO_OF_GMV = 0.011        # 直播工具/SaaS 支出占 GMV 比例（保守中低）[S-109]
+MONITOR_SHARE_OF_TOOL_SPEND = 0.22     # 监控/合规类占工具支出（令117号后上升，保守取 22%）[内部测算]
+SAM_SHARE_OF_TAM = 0.84                # SAM 占 TAM（可触达 + 可付费）
+ADDRESSABLE_ACCOUNTS_MILLION = 2.60    # 可触达付费监控账号：核心职业主播过半 + 商家自播间（保守）
+MARKET_ARPU_ANCHOR_CNY = 6_600.0       # 市场层平均年 ARPU 锚点（监控单品，保守）
+
+# 增长期"上行扩展层"——仅作上行情景附注，不进主口径 TAM / 收入
+UPSIDE_EXPANSION_LAYERS = {
+    "风控OS加购": "话术/极限词/价格/商品/刷单造假风控（令117号直接驱动）",
+    "可信数据网络/API": "可信主播认证 + 违规共享名单 + 平台/ISV API",
+    "合规履约保险/RegTech": "联合承保 + 监管治理报告",
+}
+UPSIDE_TAM_MULTIPLIER = 2.4            # 若四层全部展开，TAM 相对单层监控的放大上限（上行情景）
+
+# ───────────────────────────────────────────────────────────────────────────
+# 2. 定价（唯一可信定价方案）—— 监控 SaaS：Starter / Pro / Enterprise
 # ───────────────────────────────────────────────────────────────────────────
 PRICING = {
-    "Starter":    {"monthly": 199.0,    "annual": 2388.0,    "mix": 0.70, "monthly_churn": 0.050},
-    "Pro":        {"monthly": 599.0,    "annual": 7188.0,    "mix": 0.25, "monthly_churn": 0.025},
-    "Enterprise": {"monthly": 20833.0,  "annual": 250000.0,  "mix": 0.05, "monthly_churn": 0.008},
+    "Starter":    {"monthly": 199.0,   "annual": 2_388.0,   "mix": 0.68, "monthly_churn": 0.045},
+    "Pro":        {"monthly": 599.0,   "annual": 7_188.0,   "mix": 0.27, "monthly_churn": 0.022},
+    "Enterprise": {"monthly": 12_500.0, "annual": 150_000.0, "mix": 0.05, "monthly_churn": 0.007},
 }
-# 加权年 ARPU（核心监控 SaaS）= 0.70×2388 + 0.25×7188 + 0.05×250000 = 15,968.6 元
+# 加权年 ARPU = 0.68×2388 + 0.27×7188 + 0.05×150000 = 11,059.6 元（监控单品，保守）
 BLENDED_ARPU_ANNUAL = sum(v["annual"] * v["mix"] for v in PRICING.values())
-
-# 价格弹性（恒弹性 q = q0·p^-e）
 PRICE_ELASTICITY = {"Starter": 1.5, "Pro": 0.8, "Enterprise": 0.4}
 
 # ───────────────────────────────────────────────────────────────────────────
-# 3. 客户增长（5 年期末付费账号数）—— 核心监控 SaaS 客群
+# 3. 客户增长（5 年期末付费账号数）—— 监控 SaaS（保守，单层口径）
 # ───────────────────────────────────────────────────────────────────────────
 YEARS = ["Y1", "Y2", "Y3", "Y4", "Y5"]
-CUSTOMERS_EOY = [800, 6500, 28000, 78000, 175000]
+CUSTOMERS_EOY = [800, 5_500, 20_000, 55_000, 105_000]   # Y5≈10.5 万付费账号（保守，约占监控 SAM 个位数%）
+
+# 收入 = 付费账号 × 加权 ARPU（单层监控；不再乘四层货币化乘数）
+REVENUE_BY_YEAR_CNY = [c * BLENDED_ARPU_ANNUAL for c in CUSTOMERS_EOY]
+
+# 监控 SaaS 毛利率（随规模与推理成本下降而抬升；保守区间）
+GROSS_MARGIN = [0.70, 0.73, 0.76, 0.78, 0.80]
 
 # ───────────────────────────────────────────────────────────────────────────
-# 3b. v3 核心：四层货币化收入结构
-#     收入 = 核心监控 SaaS（客户数 × 加权 ARPU）×（1 + 各扩展层占核心比）
-#     扩展层占核心收入的比例随产品成熟度逐年提升（land-and-expand）。
+# 4. 财务驱动（占收入比 schedule）—— 复现三大报表（保守，早期高投入）
 # ───────────────────────────────────────────────────────────────────────────
-CORE_SAAS_REV_CNY = [c * BLENDED_ARPU_ANNUAL for c in CUSTOMERS_EOY]
-
-# 各扩展层"占核心监控 SaaS 收入"的比例（增量），逐年演进
-REVENUE_LAYER_RATIO = {
-    "核心监控SaaS":     [1.00, 1.00, 1.00, 1.00, 1.00],   # 基准层
-    "风控OS加购":       [0.05, 0.12, 0.20, 0.26, 0.30],   # 话术/价格/商品/刷单风控
-    "数据网络/API":     [0.00, 0.03, 0.08, 0.13, 0.18],   # 可信认证 + 名单 + 基准 + API 调用
-    "保险分润/RegTech": [0.00, 0.02, 0.06, 0.10, 0.14],   # 合规履约保险分润 + 监管治理
-}
-# 各层毛利率（数据/API、保险/RegTech 为高毛利）→ 用于混合毛利
-LAYER_GROSS_MARGIN = {
-    "核心监控SaaS":     0.78,
-    "风控OS加购":       0.80,
-    "数据网络/API":     0.88,
-    "保险分润/RegTech": 0.85,
-}
-
-# 收入分层乘数与总收入（逐年）
-REVENUE_MULTIPLIER = [
-    sum(REVENUE_LAYER_RATIO[k][t] for k in REVENUE_LAYER_RATIO)
-    for t in range(len(YEARS))
-]  # Y1≈1.05 … Y5≈1.62
-REVENUE_BY_YEAR_CNY = [CORE_SAAS_REV_CNY[t] * REVENUE_MULTIPLIER[t] for t in range(len(YEARS))]
-
-# 各层绝对收入（逐年）= 核心 SaaS × 该层占比
-REVENUE_LAYER_CNY = {
-    k: [CORE_SAAS_REV_CNY[t] * REVENUE_LAYER_RATIO[k][t] for t in range(len(YEARS))]
-    for k in REVENUE_LAYER_RATIO
-}
-# 混合毛利率（按各层收入加权）—— 由分层结构内生
-GROSS_MARGIN = [
-    sum(REVENUE_LAYER_CNY[k][t] * LAYER_GROSS_MARGIN[k] for k in REVENUE_LAYER_RATIO)
-    / REVENUE_BY_YEAR_CNY[t]
-    for t in range(len(YEARS))
-]
-
-# ───────────────────────────────────────────────────────────────────────────
-# 4. 财务驱动（占收入比 schedule）—— 复现三大报表
-# ───────────────────────────────────────────────────────────────────────────
-SM_RATIO = [0.90, 0.755, 0.61, 0.465, 0.32]    # 销售费用 / 收入
-RD_RATIO = [0.60, 0.495, 0.39, 0.285, 0.18]    # 研发费用 / 收入
-GA_RATIO = [0.30, 0.25, 0.20, 0.15, 0.10]      # 管理费用 / 收入
-OTHER_INCOME_RATIO = 0.005                      # 其他收益 / 收入
-TAX_RATE = 0.25                                 # 转盈年份所得税
+SM_RATIO = [0.95, 0.80, 0.62, 0.48, 0.36]      # 销售费用 / 收入
+RD_RATIO = [0.85, 0.62, 0.45, 0.33, 0.24]      # 研发费用 / 收入（监控算法持续投入）
+GA_RATIO = [0.35, 0.28, 0.22, 0.17, 0.13]      # 管理费用 / 收入
+OTHER_INCOME_RATIO = 0.004                      # 其他收益 / 收入
+TAX_RATE = 0.15                                 # 高新技术企业所得税优惠（转盈年份）
 CAPEX_RATIO = 0.06                              # 资本支出 / 收入
 DA_RATE = 0.30                                  # 当年折旧摊销 / 期初固定资产净值（近似）
 WC_RATIO_OF_REV = 0.12
-AR_DAYS = 45
+AR_DAYS = 50
 AP_DAYS = 30
 
 # ───────────────────────────────────────────────────────────────────────────
-# 5. 单位经济
+# 5. 单位经济（监控 SaaS）
 # ───────────────────────────────────────────────────────────────────────────
-SEGMENT_CONTRIB_MARGIN = 0.78
-CAC = {"Starter": 280.0, "Pro": 850.0, "Enterprise": 18000.0}
-CAC_BLENDED_BY_YEAR = [2000, 4500, 13000, 19000, 26500]
+SEGMENT_CONTRIB_MARGIN = 0.72
+CAC = {"Starter": 320.0, "Pro": 1_100.0, "Enterprise": 22_000.0}
+CAC_BLENDED_BY_YEAR = [2_400, 5_200, 9_500, 14_000, 19_000]
 
 # ───────────────────────────────────────────────────────────────────────────
-# 6. 融资轮次 —— v3：以【天使轮 Angel】为第一性视角
+# 6. 融资轮次 —— 标准机构节奏 Seed → A → B → C（保守规模与估值）
 #    金额 / Post-money（元）；esop_topup 为该轮新增期权池（同比稀释全体）。
-#    天使轮规模由 17_resource_requirements.py 自底向上的首程跑道倒推得到（≈¥1,000 万）。
+#    "本轮"= Seed（公司当前融资轮），作为 lead 投资人回报口径。
 # ───────────────────────────────────────────────────────────────────────────
 ROUNDS = {
-    "Angel": {"date": "Y1H1", "amount": 10_000_000,   "post_money": 50_000_000,    "esop_topup": 0.10},
-    "Seed":  {"date": "Y1H2", "amount": 30_000_000,   "post_money": 200_000_000,   "esop_topup": 0.03},
-    "A":     {"date": "Y2",   "amount": 120_000_000,  "post_money": 800_000_000,   "esop_topup": 0.03},
-    "B":     {"date": "Y3",   "amount": 900_000_000,  "post_money": 4_800_000_000, "esop_topup": 0.02},
-    "C":     {"date": "Y5",   "amount": 1_000_000_000, "post_money": 12_000_000_000, "esop_topup": 0.01},
+    "Seed": {"date": "Y1",  "amount": 20_000_000,  "post_money": 100_000_000,   "esop_topup": 0.10},
+    "A":    {"date": "Y2",  "amount": 80_000_000,  "post_money": 450_000_000,   "esop_topup": 0.05},
+    "B":    {"date": "Y3",  "amount": 200_000_000, "post_money": 1_300_000_000, "esop_topup": 0.03},
+    "C":    {"date": "Y4",  "amount": 350_000_000, "post_money": 3_000_000_000, "esop_topup": 0.02},
 }
-ROUND_ORDER = ["Angel", "Seed", "A", "B", "C"]
-# 各轮在财务模型中计入融资现金流的年份索引（Y1..Y5 → 0..4）
-ROUND_YEAR_INDEX = {"Angel": 0, "Seed": 0, "A": 1, "B": 2, "C": 4}
+ROUND_ORDER = ["Seed", "A", "B", "C"]
+ROUND_YEAR_INDEX = {"Seed": 0, "A": 1, "B": 2, "C": 3}   # 计入融资现金流的年份索引（Y1..Y5 → 0..4）
 FOUNDERS_INITIAL = 1.0
-ESOP_INITIAL = 0.0   # 期权池在天使轮首次建立（见 ROUNDS["Angel"]["esop_topup"]）
+ESOP_INITIAL = 0.0
 
-# 天使投资金额（用于回报口径）
-ANGEL_INVEST_CNY = ROUNDS["Angel"]["amount"]
-ANGEL_HOLD_YEARS = 5
-
-# Pre-Angel：王启源自投（在 Angel 之前，计入股权稀释）
-PRE_ANGEL = {
-    "investor": "王启源",
-    "amount": 5_000_000,
-    "post_money": 25_000_000,   # 对标 Pre-seed 人民币估值区间 [S-040]，保守取中位
-    "date": "Y0",
-}
+# 本轮（lead）投资人回报口径：Seed
+LEAD_ROUND = "Seed"
+LEAD_INVEST_CNY = ROUNDS["Seed"]["amount"]
+LEAD_ENTRY_POST_CNY = ROUNDS["Seed"]["post_money"]
+HOLD_YEARS = 6                          # Seed 入场到退出的现实持有期（2026 时间线显著拉长）[S-110]
 
 # ───────────────────────────────────────────────────────────────────────────
-# 6b. 创始人王启源个人决策（21_personal_kelly_founder.py）
+# 7. 估值参数 —— 2026 已大幅压缩的 SaaS 倍数（保守）
+#    公募 SaaS EV/Rev 中位 3.4–6.4×；垂直 SaaS 4–8× ARR；B2B 中速 EV/EBITDA 8–15×。[S-111][S-112][S-113]
 # ───────────────────────────────────────────────────────────────────────────
-FOUNDER = {
-    "name": "王启源",
-    "role": "大学教师·课余创始",
-    "cash_capital_CNY": 5_000_000,
-    "time_horizon_years": 5,
-    "time_opportunity_cost_per_year_CNY": 1_000_000,
-    "economic_bankroll_CNY": 10_000_000,
-    "hours_per_week_light": (15, 20),
-}
-
-FOUNDER_PART_TIME_P_ADVANCE_MULT = 0.82   # 课余轻量创始：每闸门 p_advance × 0.82 [S-042]
-FOUNDER_PARTIAL_EXIT_BUMP = 0.02          # 部分退出概率略上调（并购回收不确定性）
-
-KELLY_FRACTIONAL = 0.25                   # 四分之一凯利（参数误差 + 高方差）
-KELLY_MAX_POSITION_OF_BANKROLL = 0.35     # 硬上限：不建议超过 bankroll 的 35%
-KELLY_CASH_SHARE_OF_COMMITMENT = 0.50     # 总承诺中现金占比（其余为时间机会成本）
+WACC = 0.155
+TERMINAL_G = 0.025
+EXIT_EV_EBITDA = 13.0
+EVS_MULTIPLE = {"p25": 3.0, "median": 4.5, "p75": 6.0}     # EV/Sales（2026 压缩后）
+EVEBITDA_MULTIPLE = {"p25": 10.0, "median": 13.0, "p75": 17.0}
+# Y6-Y10 过渡期（保守增长与利润率爬坡）
+TRANSITION_GROWTH = [0.28, 0.24, 0.20, 0.17, 0.14]
+TRANSITION_OPMARGIN = [0.18, 0.20, 0.22, 0.24, 0.26]
+# 多模型加权权重（DCF / EV-Sales / EV-EBITDA / 蒙特卡洛分布中位）
+VALUATION_WEIGHTS = {"dcf": 0.30, "ev_sales": 0.25, "ev_ebitda": 0.25, "mc_median": 0.20}
 
 # ───────────────────────────────────────────────────────────────────────────
-# 7. 估值参数
-# ───────────────────────────────────────────────────────────────────────────
-WACC = 0.14
-TERMINAL_G = 0.03
-EXIT_EV_EBITDA = 18.0
-EVS_MULTIPLE = {"p25": 3.4, "median": 4.6, "p75": 6.6}     # EV/Sales 可比池
-EVEBITDA_MULTIPLE = {"p25": 18.0, "median": 25.0, "p75": 36.0}
-# Y6-Y10 过渡期
-TRANSITION_GROWTH = [0.30, 0.27, 0.24, 0.21, 0.18]
-TRANSITION_OPMARGIN = [0.20, 0.22, 0.24, 0.26, 0.28]
-
-# ───────────────────────────────────────────────────────────────────────────
-# 8. 阶段闸门生存模型（19_success_probability.py）
-#    天使 → Seed → A → B → C → 成功退出 的逐级"前进概率"。
-#    对标早期硬科技 / 垂直 AI SaaS 的行业基准，并按本项目优势/风险做调整。
-#    失败时以一定概率发生"部分退出（并购/acqui-hire）"，回收对应阶段估值的一个折扣。
+# 8. 阶段闸门生存模型（19_success_and_returns.py）—— 2026 真实晋级率（保守）
+#    Seed → A → B → C → 成功退出 的逐级"前进概率"。
+#    Seed→A 2026 已跌至 15–24%（历史 30–40%）；A→B、B→C ~55–60%；成长期退出不确定性高。[S-110][S-114]
+#    失败时以一定概率发生"部分退出（并购/acqui-hire）"，回收对应阶段 pre-money 的折扣。
 # ───────────────────────────────────────────────────────────────────────────
 STAGE_GATES = [
-    # name,            year_reached, p_advance, partial_exit_prob, partial_recovery_frac
-    ("Angel→Seed",     0.5,          0.72,      0.20,              0.40),
-    ("Seed→A",         1.0,          0.55,      0.25,              0.45),
-    ("A→B",            2.0,          0.50,      0.28,              0.50),
-    ("B→C",            3.0,          0.55,      0.30,              0.55),
-    ("C→成功退出",      5.0,          0.65,      0.40,              0.60),
+    # name,        year_reached, p_advance, partial_exit_prob, partial_recovery_frac
+    ("Seed→A",      1.0,          0.22,      0.18,              0.35),
+    ("A→B",         2.0,          0.50,      0.25,              0.45),
+    ("B→C",         3.0,          0.55,      0.28,              0.50),
+    ("C→成功退出",   6.0,          0.45,      0.35,              0.55),
 ]
-# 成功退出时（到达 C 并退出）退出 EV 的对数正态参数（围绕加权综合 EV，由 14 模型给出）
-EXIT_EV_SIGMA = 0.45     # 退出 EV 对数正态波动（反映上行/下行不确定性）
-# 各阶段"部分退出"的参考 pre-money（元），用于回收估值基准
+EXIT_EV_SIGMA = 0.55     # 退出 EV 对数正态波动（高方差，反映退出极不确定）
 STAGE_REF_PREMONEY_CNY = {
-    "Angel→Seed": ROUNDS["Seed"]["post_money"] - ROUNDS["Seed"]["amount"],
     "Seed→A":     ROUNDS["A"]["post_money"] - ROUNDS["A"]["amount"],
     "A→B":        ROUNDS["B"]["post_money"] - ROUNDS["B"]["amount"],
     "B→C":        ROUNDS["C"]["post_money"] - ROUNDS["C"]["amount"],
     "C→成功退出":  ROUNDS["C"]["post_money"],
 }
-
-# 课余轻量创始：阶段闸门折扣版（p_advance × 0.82，partial_exit +2pp）
-STAGE_GATES_FOUNDER = [
-    (
-        g[0], g[1],
-        round(g[2] * FOUNDER_PART_TIME_P_ADVANCE_MULT, 4),
-        min(0.95, g[3] + FOUNDER_PARTIAL_EXIT_BUMP),
-        g[4],
-    )
-    for g in STAGE_GATES
-]
+# 闸门概率敏感性区间（±，用于 §12 稳健性）
+STAGE_GATE_SENS_PP = 0.07
 
 # ───────────────────────────────────────────────────────────────────────────
-# 9. 创立所需资源（17_resource_requirements.py）—— 自底向上，非"限定投入"
+# 9. 创立所需资源（17_resource_requirements.py）—— 自底向上
 # ───────────────────────────────────────────────────────────────────────────
 HEADCOUNT_PLAN = {
-    "研发/算法/工程":     [20, 50, 100, 150, 180],
-    "销售(S&M)":          [8, 30, 60, 110, 160],
-    "客户成功/运营":      [4, 15, 30, 60, 100],
-    "管理/财务/法务/HR":  [3, 10, 20, 30, 40],
+    "研发/算法/工程":     [14, 32, 60, 95, 130],
+    "销售(S&M)":          [5, 18, 40, 70, 110],
+    "客户成功/运营":      [3, 10, 22, 42, 70],
+    "管理/财务/法务/HR":  [2, 7, 14, 22, 32],
 }
-AVG_SALARY_WAN = [50, 55, 58, 62, 65]          # 人均年薪（万元）
+AVG_SALARY_WAN = [48, 52, 56, 60, 64]          # 人均年薪（万元，含社保）
 
-# 首程（天使轮覆盖期）资源 —— 用于倒推天使轮规模
-FOUNDING_TEAM_SIZE = 12                          # 启动核心团队（含创始团队 7 + 首批工程/标注 5）
-FOUNDING_AVG_SALARY_WAN = 45                     # 首程人均年化（万元，含社保）
-ANGEL_RUNWAY_MONTHS = 9                          # 天使轮目标跑道（精益跑到 Seed 里程碑）
-ANGEL_BUFFER = 0.15                              # 天使轮风险缓冲
-# 天使覆盖期（精益）资源强度
-ANGEL_ANNOTATION_HOURS = 25_000                  # 首程标注小时（MVP 冷启动）
-ANGEL_GPU_NODES = 6                              # 首程 GPU 节点
-ANGEL_INIT_LICENSE_KEYS = ["算法备案", "增值电信业务经营许可证(ICP/EDI)"]  # 首程优先取得
-ANGEL_OFFICE_LEGAL_MISC_WAN_PER_MONTH = 9        # 首程办公/法务/杂项（万元/月）
+# 首程（Seed 轮覆盖期）资源 —— 用于倒推 Seed 轮规模
+FOUNDING_TEAM_SIZE = 10
+FOUNDING_AVG_SALARY_WAN = 45
+SEED_RUNWAY_MONTHS = 12                          # Seed 目标跑道（跑到 A 轮里程碑）
+SEED_BUFFER = 0.15
+SEED_ANNOTATION_HOURS = 20_000
+SEED_GPU_NODES = 5
+SEED_INIT_LICENSE_KEYS = ["算法备案", "增值电信业务经营许可证(ICP/EDI)"]
+SEED_OFFICE_LEGAL_MISC_WAN_PER_MONTH = 8
 
 # 算力 / 边缘
-UNIT_INFER_COST_Y1 = 260                         # 单路年化推理成本（元）
-UNIT_INFER_COST_YOY_DROP = 0.28                  # GPU 推理成本年降 [S-094]
-GPU_NODE_MONTHLY_CNY = 18_000                    # 单 GPU 节点（A10/L40 级）月成本（云）
-GPU_NODE_PATHS = 100                             # 单节点可服务直播路数（1080p）
-EDGE_BOX_BOM_CNY = 1_200                         # 边缘盒子 BOM 中位
+UNIT_INFER_COST_Y1 = 240                         # 单路年化推理成本（元）
+UNIT_INFER_COST_YOY_DROP = 0.28                  # GPU 推理成本年降 [S-115]
+GPU_NODE_MONTHLY_CNY = 16_000                    # 单 GPU 节点（L40/国产替代级）月成本（云）
+GPU_NODE_PATHS = 120                             # 单节点可服务直播路数（1080p）
+EDGE_BOX_BOM_CNY = 1_100                         # 边缘盒子 BOM 中位
 
 # 数据采集与标注（垂类数据飞轮）
-ANNOTATION_CUM_HOURS = [50_000, 200_000, 500_000, 2_000_000, 5_000_000]  # 累计标注小时
-ANNOTATION_PRICE_CNY_PER_HOUR = 110              # 标注单价（元/小时，中位）
+ANNOTATION_CUM_HOURS = [40_000, 150_000, 400_000, 1_000_000, 2_200_000]
+ANNOTATION_PRICE_CNY_PER_HOUR = 105
 
 # 资质 / 牌照（一次性 + 年费近似，元）
 LICENSE_COSTS_CNY = {
@@ -287,26 +229,24 @@ LICENSE_COSTS_CNY = {
     "增值电信业务经营许可证(ICP/EDI)": 300_000,
     "PIPL 第三方审计": 350_000,
 }
-
-# 平台合作 / BD（首 2 年预算，元）
-PLATFORM_BD_BUDGET_CNY = 6_000_000
+PLATFORM_BD_BUDGET_CNY = 5_000_000
 
 # ───────────────────────────────────────────────────────────────────────────
 # 10. 技术基准（端到端调优后中位指标）
 # ───────────────────────────────────────────────────────────────────────────
 TECH_MODELS = [
-    {"module": "人脸检测", "model": "RetinaFace+SCRFD", "tag": "S-030", "metric": "P=98.2% R=97.5%", "latency_ms": 12},
-    {"module": "人形检测", "model": "YOLOv8s",          "tag": "S-031", "metric": "mAP@0.5=0.95",    "latency_ms": 8},
-    {"module": "行人 Re-ID", "model": "OSNet(微调)",     "tag": "S-032", "metric": "Rank-1=94.2%",   "latency_ms": 15},
-    {"module": "行为识别", "model": "SlowFast R50",     "tag": "S-033", "metric": "Top-1=78.3%",    "latency_ms": 42},
-    {"module": "行为识别(SOTA)", "model": "VideoMAE-B", "tag": "S-034", "metric": "Top-1=80.7%",    "latency_ms": 55},
-    {"module": "活体检测", "model": "Silent-Face-AS",   "tag": "S-036", "metric": "ACER=2.1%",      "latency_ms": 10},
-    {"module": "声纹验证", "model": "ECAPA-TDNN",       "tag": "S-035", "metric": "EER=0.87%",      "latency_ms": 18},
+    {"module": "人脸检测", "model": "RetinaFace+SCRFD", "tag": "S-130", "metric": "P=98.2% R=97.5%", "latency_ms": 12},
+    {"module": "人形检测", "model": "YOLOv8s",          "tag": "S-131", "metric": "mAP@0.5=0.95",    "latency_ms": 8},
+    {"module": "行人 Re-ID", "model": "OSNet(微调)",     "tag": "S-132", "metric": "Rank-1=94.2%",   "latency_ms": 15},
+    {"module": "行为识别", "model": "SlowFast R50",     "tag": "S-133", "metric": "Top-1=78.3%",    "latency_ms": 42},
+    {"module": "行为识别(SOTA)", "model": "VideoMAE-B", "tag": "S-134", "metric": "Top-1=80.7%",    "latency_ms": 55},
+    {"module": "活体检测", "model": "Silent-Face-AS",   "tag": "S-136", "metric": "ACER=2.1%",      "latency_ms": 10},
+    {"module": "声纹验证", "model": "ECAPA-TDNN",       "tag": "S-135", "metric": "EER=0.87%",      "latency_ms": 18},
 ]
 SYSTEM_KPI = {
-    "precision": 0.9925, "recall": 0.9925, "f1": 0.9925,
-    "far": 0.006, "fnr": 0.004,
-    "alert_p50_s": 42, "alert_p90_s": 58, "alert_p99_s": 72,
+    "precision": 0.988, "recall": 0.985, "f1": 0.9865,
+    "far": 0.012, "fnr": 0.015,
+    "alert_p50_s": 45, "alert_p90_s": 60, "alert_p99_s": 78,
     "availability": 0.999,
 }
 
@@ -314,25 +254,29 @@ SYSTEM_KPI = {
 # 数据源编号 → 描述（BP 附录 A）
 # ───────────────────────────────────────────────────────────────────────────
 SOURCES = {
-    "S-001": "商务部《2024 年中国电子商务报告》",
-    "S-002": "艾瑞咨询《2024 中国直播电商行业研究报告》",
-    "S-005": "人社部 2024 新职业名录（网络主播）",
-    "S-008": "克劳锐《2024 中国 MCN 行业发展白皮书》",
-    "S-013": "CNNIC 第 53 次中国互联网络发展状况统计报告",
-    "S-015": "Frost & Sullivan 中国电商 SaaS 工具支出占比研究",
-    "S-018": "全球直播电商规模（Coresight / eMarketer 综合）",
-    "S-020": "麦肯锡《中国消费者报告 2024》",
-    "S-023": "抖音电商《管理总则·违规细则》2024",
-    "S-024": "淘宝直播《直播管理规范》2024",
-    "S-030": "RetinaFace / SCRFD 论文与开源 README",
-    "S-031": "YOLOv8 Ultralytics 文档",
-    "S-032": "OSNet (Zhou et al., ICCV 2019)",
-    "S-033": "SlowFast (Feichtenhofer et al., ICCV 2019)",
-    "S-034": "VideoMAE (Tong et al., NeurIPS 2022)",
-    "S-035": "ECAPA-TDNN (Desplanques et al., Interspeech 2020)",
-    "S-036": "Silent-Face-Anti-Spoofing (MiniVision 开源)",
-    "S-040": "CB Insights / 红杉《种子-成长期阶段晋级与存活率基准 2024》",
-    "S-041": "Correlation Ventures / AngelList 早期投资回报分布研究",
-    "S-042": "创始时间投入与存活率（CB Insights 种子期创始每周<20h 存活率显著低于全职；行业调研综合）",
-    "S-094": "NVIDIA GTC 2024/2025 + 寒武纪/昇腾国产替代成本曲线综合",
+    # 市场（2026 实时调研）
+    "S-101": "市场监管总局发展研究中心+社科院《2025 直播电商行业发展白皮书》(新华社, 2026-03)：2025 GMV>5万亿、店播占比>50%、直播相关企业256.96万家",
+    "S-102": "华经产业研究院《2026 中国直播电商行业市场深度分析》：2025 GMV 5.26万亿(+16.5%)、渗透率32.92%",
+    "S-103": "网经社「电数宝」《年度中国直播电商2025市场数据报告》(2026-05)：2025 GMV 6.95万亿(+30.4%)、用户6.6亿",
+    "S-104": "广州市商务局/艾瑞：2024 GMV≈5.8万亿、2024–26 CAGR≈18%；国家统计局2024网络零售15.52万亿",
+    "S-105": "《中国网络视听发展研究报告(2024)》：2024职业主播3880万人(同比+1.5倍)",
+    "S-106": "《直播电商监督管理办法》(市监总局+网信办令第117号, 2025-12-18公布, 2026-02-01施行)",
+    "S-107": "《互联网信息内容多渠道分发服务管理规定》(2026-09-01施行)",
+    "S-108": "《生成式人工智能服务管理暂行办法》(2023-08-15) + 算法备案制度",
+    "S-109": "Frost & Sullivan / 艾瑞 中国电商 SaaS 工具支出占 GMV 比例研究",
+    "S-110": "Crunchbase《Seed Deals 2026》/ Carta：Seed→A 晋级率2023年24%、2024年16%；时间拉长至>2年",
+    # 估值
+    "S-111": "Aventis Advisors《SaaS Valuation Multiples 2015–2026》：2026-03 公募 SaaS EV/Rev 中位 3.4×",
+    "S-112": "SaaS Capital Index / BVP Emerging Cloud：2026 Q1 中位 6.4× / 8.0×；垂直 SaaS 4–8× ARR",
+    "S-113": "QuantPillar《2025–2026 Private Market Valuation Multiples》：B2B中速 EV/EBITDA 8–15×、垂直 SaaS 10–18×",
+    "S-114": "Chronograph / Incisive Ventures：A→B、B→C 晋级率约55–60%；幂律 5–10% 项目贡献多数回报",
+    "S-115": "NVIDIA GTC 2024/2025 + 寒武纪/昇腾国产替代成本曲线综合：推理成本年降≈28%",
+    # 技术
+    "S-130": "RetinaFace / SCRFD 论文与开源 README",
+    "S-131": "YOLOv8 Ultralytics 文档",
+    "S-132": "OSNet (Zhou et al., ICCV 2019)",
+    "S-133": "SlowFast (Feichtenhofer et al., ICCV 2019)",
+    "S-134": "VideoMAE (Tong et al., NeurIPS 2022)",
+    "S-135": "ECAPA-TDNN (Desplanques et al., Interspeech 2020)",
+    "S-136": "Silent-Face-Anti-Spoofing (MiniVision 开源)",
 }

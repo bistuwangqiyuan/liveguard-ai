@@ -30,8 +30,8 @@ from docx.oxml import OxmlElement
 ROOT = Path(__file__).parent.parent.parent
 BUILD = ROOT / "liveguard" / "bp_build"
 REF = BUILD / "reference.docx"
-MD = ROOT / "守播LiveGuard_商业计划书_v4.0.md"
-OUT = ROOT / "守播LiveGuard_商业计划书_v4.0.docx"
+MD = ROOT / "守播LiveGuard_商业计划书_v5.0.md"
+OUT = ROOT / "守播LiveGuard_商业计划书_v5.0.docx"
 
 LATIN_FONT = "Microsoft YaHei"
 CJK_FONT = "Microsoft YaHei"
@@ -103,7 +103,7 @@ def build_reference():
 
     header = section.header
     p = header.paragraphs[0]
-    r = p.add_run("守播 LiveGuard AI · 商业计划书 v3.0")
+    r = p.add_run("守播 LiveGuard AI · 商业计划书 v5.0")
     style_run(r, size_pt=9, color_hex=GREY)
     p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
 
@@ -118,7 +118,7 @@ def build_reference():
     r = cover.add_run("\n\n\n\n守播 LiveGuard AI")
     style_run(r, font_name=HEADING_FONT, size_pt=36, bold=True, color_hex=PRIMARY)
     cover.add_run("\n")
-    r = cover.add_run("直播经济实时可信与风控中台\n商业计划书 v3.0 · 天使 IRR 优先")
+    r = cover.add_run("直播间 AI 实时合规监控 SaaS\n商业计划书 v5.0 · 机构标准版")
     style_run(r, font_name=HEADING_FONT, size_pt=18, color_hex=INK)
     cover.add_run("\n")
     r = cover.add_run("\n2026 年 06 月 01 日")

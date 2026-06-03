@@ -7,8 +7,8 @@
 
 * 显性期 Y1–Y5：直接取模型 FCF（= CFO + CFI）
 * 过渡期 Y6–Y10：收入按 TRANSITION_GROWTH 递减增长；FCF = 收入 × 营业利润率 × (1−税率)
-* 终值（Y10）：退出 EV/EBITDA = 18×（EBITDA = 收入 ×(营业利润率+6% 折旧率)）
-* WACC = 14%
+* 终值（Y10）：退出 EV/EBITDA = 13×（2026 压缩，EBITDA = 收入 ×(营业利润率+6% 折旧率)）
+* WACC = 15.5%
 * Gordon 对照：终值 = FCF_Y10×(1+g)/(WACC−g)
 """
 
@@ -75,7 +75,7 @@ payload = {
 print("── 两阶段 DCF 估值 ──")
 print(f"  PV(显性 Y1-Y5)  = {fmt_cny(pv_explicit)}")
 print(f"  PV(过渡 Y6-Y10) = {fmt_cny(pv_transition)}")
-print(f"  PV(终值 @18×)   = {fmt_cny(pv_terminal_exit)}")
+print(f"  PV(终值 @{EXIT:.0f}×)   = {fmt_cny(pv_terminal_exit)}")
 print(f"  EV(两阶段)      = {fmt_cny(ev_two_stage)}")
 print(f"  EV(Gordon g=3%) = {fmt_cny(ev_gordon)}")
 
@@ -83,7 +83,7 @@ write_json("12_valuation_dcf", payload)
 
 # ── 图：DCF 价值桥 + FCF 曲线 ──────────────────────────────────────────────
 fig, axs = plt.subplots(1, 2, figsize=(12.2, 4.6))
-labels = ["PV显性\nY1-Y5", "PV过渡\nY6-Y10", "PV终值\n@18×", "EV合计"]
+labels = ["PV显性\nY1-Y5", "PV过渡\nY6-Y10", f"PV终值\n@{EXIT:.0f}×", "EV合计"]
 vals = [pv_explicit / 1e8, pv_transition / 1e8, pv_terminal_exit / 1e8, ev_two_stage / 1e8]
 cum = 0
 for i in range(3):

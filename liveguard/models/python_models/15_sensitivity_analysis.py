@@ -49,8 +49,8 @@ for label, lo_kw, hi_kw in [
     ("Enterprise 单价 ±20%", {"prices": {"Enterprise": base_prices["Enterprise"] * 0.8}}, {"prices": {"Enterprise": base_prices["Enterprise"] * 1.2}}),
     ("Pro 价格 ±20%", {"prices": {"Pro": base_prices["Pro"] * 0.8}}, {"prices": {"Pro": base_prices["Pro"] * 1.2}}),
     ("Starter 价格 ±20%", {"prices": {"Starter": base_prices["Starter"] * 0.8}}, {"prices": {"Starter": base_prices["Starter"] * 1.2}}),
-    ("Enterprise 占比 ±2pct", {"mixes": {"Enterprise": 0.03, "Starter": 0.72}}, {"mixes": {"Enterprise": 0.07, "Starter": 0.68}}),
-    ("Pro 占比 ±5pct", {"mixes": {"Pro": 0.20, "Starter": 0.75}}, {"mixes": {"Pro": 0.30, "Starter": 0.65}}),
+    ("Enterprise 占比 ±2pct", {"mixes": {"Enterprise": 0.03, "Starter": 0.70}}, {"mixes": {"Enterprise": 0.07, "Starter": 0.66}}),
+    ("Pro 占比 ±5pct", {"mixes": {"Pro": 0.22, "Starter": 0.73}}, {"mixes": {"Pro": 0.32, "Starter": 0.63}}),
 ]:
     lo = rev_with(**lo_kw); hi = rev_with(**hi_kw)
     rev_drivers.append({
@@ -95,14 +95,13 @@ for label, lo_kw, hi_kw in [
 ev_drivers.sort(key=lambda d: d["range_pp"], reverse=True)
 
 payload = {
-    "as_of": DS.AS_OF,
-    "base_y5_core_saas_revenue_yi": round(base_rev / 1e8, 2),
-    "base_y5_total_revenue_yi": round(DS.REVENUE_BY_YEAR_CNY[-1] / 1e8, 2),
+    "as_of": DS.AS_OF, "version": DS.VERSION,
+    "base_y5_revenue_yi": round(base_rev / 1e8, 2),
     "base_ev_yi": round(base_ev / 1e8, 1),
-    "revenue_tornado_note": "收入龙卷风针对【核心监控 SaaS 层】定价/结构驱动；扩展层见 20_business_model_layers。",
+    "revenue_tornado_note": "收入龙卷风针对监控 SaaS 定价/结构驱动（单层口径）。",
     "revenue_tornado": rev_drivers,
     "ev_tornado": ev_drivers,
-    "sources": ["逐参数重算敏感性", "BP §10"],
+    "sources": ["逐参数重算敏感性", "BP §11"],
 }
 
 print("── Y5 收入敏感性 ──")

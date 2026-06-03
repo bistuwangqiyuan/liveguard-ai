@@ -38,7 +38,7 @@ payload = {
     "unit_infer_cost_curve_CNY": {f"Y{i+1}": c for i, c in enumerate(cost)},
     "anti_cheat_scores": anticheat,
     "anti_cheat_avg": anticheat_avg,
-    "sources": [DS.SOURCES[k] for k in ("S-030", "S-031", "S-032", "S-033", "S-034", "S-035", "S-036", "S-094")],
+    "sources": [DS.SOURCES[k] for k in ("S-130", "S-131", "S-132", "S-133", "S-134", "S-135", "S-136", "S-115")],
 }
 
 print("── 技术基准 ──")

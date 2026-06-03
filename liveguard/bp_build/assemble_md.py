@@ -1,9 +1,9 @@
 """
-assemble_md.py  ·  守播 LiveGuard v4.0
+assemble_md.py  ·  守播 LiveGuard v5.0
 ======================================
 
-把 bp_build/bp4_section_*.md 17 个分章节拼装为仓库根目录的
-`守播LiveGuard_商业计划书_v4.0.md`。
+把 bp_build/bp5_section_*.md 17 个分章节拼装为仓库根目录的
+`守播LiveGuard_商业计划书_v5.0.md`。
 """
 
 from __future__ import annotations
@@ -19,62 +19,62 @@ except Exception:
 
 ROOT = Path(__file__).parent.parent.parent
 BUILD = ROOT / "liveguard" / "bp_build"
-OUT = ROOT / "守播LiveGuard_商业计划书_v4.0.md"
+OUT = ROOT / "守播LiveGuard_商业计划书_v5.0.md"
 
 SECTIONS = [
-    "bp4_section_00_executive.md",
-    "bp4_section_01_business_model.md",
-    "bp4_section_02_market.md",
-    "bp4_section_03_competition.md",
-    "bp4_section_04_product.md",
-    "bp4_section_05_pricing_unit.md",
-    "bp4_section_06_gtm.md",
-    "bp4_section_07_ops.md",
-    "bp4_section_08_resources.md",
-    "bp4_section_09_finance.md",
-    "bp4_section_10_valuation.md",
-    "bp4_section_11_success_probability.md",
-    "bp4_section_12_funding.md",
-    "bp4_section_13_risk.md",
-    "bp4_section_14_team.md",
-    "bp4_section_15_roadmap.md",
-    "bp4_section_99_appendix.md",
+    "bp5_section_00_executive.md",
+    "bp5_section_01_company_product.md",
+    "bp5_section_02_market.md",
+    "bp5_section_03_competition.md",
+    "bp5_section_04_product_tech.md",
+    "bp5_section_05_business_model.md",
+    "bp5_section_06_gtm.md",
+    "bp5_section_07_operations.md",
+    "bp5_section_08_unit_economics.md",
+    "bp5_section_09_finance.md",
+    "bp5_section_10_funding.md",
+    "bp5_section_11_valuation.md",
+    "bp5_section_12_success_returns.md",
+    "bp5_section_13_risk.md",
+    "bp5_section_14_team.md",
+    "bp5_section_15_roadmap.md",
+    "bp5_section_99_appendix.md",
 ]
 
-HEADER = """# 守播 LiveGuard AI · 直播经济实时可信与风控中台
-## 商业计划书 (Business Plan) · v4.0 — 创始人凯利仓位 + 天使 IRR
+HEADER = """# 守播 LiveGuard AI · 直播间 AI 实时合规监控 SaaS
+## 商业计划书 (Business Plan) · v5.0 — 机构标准版（完全重构）
 **编制日期**：2026 年 06 月 01 日
 
 ---
 
-> **重要提示**：本文档为公司机密。v4.0 以**创始人王启源个人决策**（胜率 × 盈亏比 × 凯利仓位）为第一屏，
-> 第二屏保留天使 IRR。全部数字由 `liveguard/models/python_models/` 下 **21 个 Python 模型**可复现
->（seed=42，N=200,000）；运行 `python run_all.py` 一键重现，详见附录 B。
+> **重要提示**：本文档为公司机密，面向机构投资人。v5.0 回归"AI 直播监控本体"，采用 2026 实时调研数据、
+> 2026 压缩估值倍数与真实阶段晋级率。全部数字由 `liveguard/models/python_models/` 下 **19 个 Python 模型**可复现
+>（seed=42，N=200,000）；运行 `python run_all.py` 一键重现，详见附录 B。资产负债表勾稽差异 = 0 元。
 >
-> **早期创业/股权投资具有高风险**：创始人课余情景 P(全损)≈72.1%、天使 P(全损)≈69.5%。
-> 期望收益为概率加权模型结果，不构成回报承诺。
+> **早期股权投资具有高风险**：主案 P(本金全损)≈77.9%。回报以多口径（中位/期望/条件于成功/逐路径 IRR 分位）披露，
+> 均为情景建模结果，**不构成回报承诺或投资建议**。
 
 ---
 
 ## 目录 (Table of Contents)
 
-- 00 执行摘要（王启源凯利仓位 + 天使 IRR 双视角）
-- 01 商业模式与价值链机会
+- 00 执行摘要
+- 01 公司与产品概述
 - 02 行业与市场分析
-- 03 竞争分析
+- 03 竞争分析与差异化定位
 - 04 产品与技术
-- 05 定价与单位经济
-- 06 GTM
-- 07 运营与组织
-- 08 创立所需资源（个人 vs 公司资本）
+- 05 商业模式与定价
+- 06 进入市场策略 (GTM)
+- 07 运营、组织与创立资源
+- 08 单位经济
 - 09 财务预测
-- 10 估值
-- 11 成功概率与预期收益（天使 + §11b 创始人凯利）
-- 12 融资与 Cap Table（含 Pre-Angel）
+- 10 融资与 Cap Table
+- 11 估值（2026 压缩倍数）
+- 12 成功概率与投资回报（多口径）
 - 13 风险分析
-- 14 团队（王启源）
+- 14 团队与组织
 - 15 路线图
-- 99 附录
+- 99 附录（数据源 / 模型 / 方法学）
 
 ---
 

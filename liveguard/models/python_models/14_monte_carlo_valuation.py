@@ -5,11 +5,11 @@
 蒙特卡洛估值（N=200,000）+ 多模型加权综合 EV。对应 BP §9.4.3 / §9.4.4。
 读取 12_valuation_dcf.json 与 13_valuation_comparables.json。
 
-参数分布：
-* Y5 收入：截断正态 N(基准, σ=18%)，[0.5x, 1.8x]
-* Y5 营业利润率：截断正态 N(18%, 8pct)，[-15%, 45%]
-* EV/Sales：三角 (3, 7, 14)
-* WACC：N(14%, 2%)；g：N(3%, 1%)
+参数分布（2026 保守压缩）：
+* Y5 收入：截断正态 N(基准, σ=20%)，[0.45x, 1.7x]
+* Y5 营业利润率：截断正态 N(16%, 7pct)，[-15%, 40%]
+* EV/Sales：三角 (2.5, 4.5, 8.0)  ← 2026 压缩后倍数
+* WACC：N(15.5%, 2%)；g：N(2.5%, 1%)
 * EV = 0.5×DCF(简化) + 0.5×EV/Sales
 """
 
@@ -39,22 +39,22 @@ def trunc_normal(mean, sd, lo, hi, n):
     return np.clip(x, lo, hi)
 
 
-rev_y5 = trunc_normal(rev_base, rev_base * 0.18, rev_base * 0.5, rev_base * 1.8, N)
-op_margin = trunc_normal(0.18, 0.08, -0.15, 0.45, N)
-evs = r.triangular(3.0, 7.0, 14.0, N)
-wacc = trunc_normal(0.14, 0.02, 0.09, 0.20, N)
-g = trunc_normal(0.03, 0.01, 0.005, 0.05, N)
+rev_y5 = trunc_normal(rev_base, rev_base * 0.20, rev_base * 0.45, rev_base * 1.7, N)
+op_margin = trunc_normal(0.16, 0.07, -0.15, 0.40, N)
+evs = r.triangular(DS.EVS_MULTIPLE["p25"] - 0.5, DS.EVS_MULTIPLE["median"], 8.0, N)
+wacc = trunc_normal(DS.WACC, 0.02, 0.11, 0.21, N)
+g = trunc_normal(DS.TERMINAL_G, 0.01, 0.005, 0.045, N)
 
-# 简化 DCF：从 Y5 收入按 10 年 taper 增长，FCF=收入×营业利润率×0.75，终值 Gordon
+# 简化 DCF：从 Y5 收入按 10 年 taper 增长，FCF=收入×营业利润率×0.72，终值 Gordon
 def dcf_simplified():
     rev = rev_y5.copy()
     pv = np.zeros(N)
-    growth = np.array([0.30, 0.27, 0.24, 0.21, 0.18])
+    growth = np.array(DS.TRANSITION_GROWTH)
     for t in range(5):
         rev = rev * (1 + growth[t])
-        fcf = rev * op_margin * 0.75
+        fcf = rev * op_margin * 0.72
         pv += fcf / (1 + wacc) ** (t + 1)
-    terminal_fcf = rev * op_margin * 0.75 * (1 + g)
+    terminal_fcf = rev * op_margin * 0.72 * (1 + g)
     tv = terminal_fcf / (wacc - g)
     pv += tv / (1 + wacc) ** 5
     return pv
@@ -69,31 +69,32 @@ quantiles = {f"P{q}": round(float(np.percentile(ev_combined, q)) / 1e8, 1) for q
 mc_mean_yi = round(float(np.mean(ev_combined)) / 1e8, 1)
 mc_p50 = float(np.percentile(ev_combined, 50))
 
-# ── 多模型加权综合（§9.4.4）─────────────────────────────────────────────────
+# ── 多模型加权综合（§11）─────────────────────────────────────────────────────
+W = DS.VALUATION_WEIGHTS
 methods = {
-    "DCF(两阶段+退出)": {"weight": 0.25, "ev_yi": dcf["EV_two_stage_yi"]},
-    "DCF(Gordon对照)": {"weight": 0.10, "ev_yi": dcf["EV_gordon_yi"]},
-    "EV/Sales(中位)": {"weight": 0.20, "ev_yi": comp["EV_Sales_valuation_yi"]["median"]},
-    "EV/EBITDA(中位)": {"weight": 0.15, "ev_yi": comp["EV_EBITDA_valuation_yi"]["median"]},
-    "蒙特卡洛(P50)": {"weight": 0.30, "ev_yi": round(mc_p50 / 1e8, 1)},
+    "DCF(两阶段+退出)": {"weight": W["dcf"], "ev_yi": dcf["EV_two_stage_yi"]},
+    "EV/Sales(中位)": {"weight": W["ev_sales"], "ev_yi": comp["EV_Sales_valuation_yi"]["median"]},
+    "EV/EBITDA(中位)": {"weight": W["ev_ebitda"], "ev_yi": comp["EV_EBITDA_valuation_yi"]["median"]},
+    "蒙特卡洛(P50)": {"weight": W["mc_median"], "ev_yi": round(mc_p50 / 1e8, 1)},
 }
 weighted_ev_yi = round(sum(m["weight"] * m["ev_yi"] for m in methods.values()), 1)
+investor_range_yi = [round(np.percentile(ev_combined, 25) / 1e8, 0), round(np.percentile(ev_combined, 75) / 1e8, 0)]
 
 payload = {
-    "as_of": DS.AS_OF, "currency": "CNY", "monte_carlo_n": int(N),
+    "as_of": DS.AS_OF, "currency": "CNY", "version": DS.VERSION, "monte_carlo_n": int(N),
     "mc_quantiles_yi": quantiles, "mc_mean_yi": mc_mean_yi,
     "weighted_methods": methods, "weighted_EV_yi": weighted_ev_yi,
-    "investor_range_yi": [150, 260],
-    "c_round_post_money_yi": round(DS.ROUNDS["C"]["post_money"] / 1e8, 0),
-    "sources": ["蒙特卡洛 N=200k seed=42", "DCF + 可比综合加权"],
+    "investor_range_yi": investor_range_yi,
+    "c_round_post_money_yi": round(DS.ROUNDS["C"]["post_money"] / 1e8, 1),
+    "sources": ["蒙特卡洛 N=200k seed=42", "2026 压缩倍数 DCF + 可比综合加权"],
 }
 
-print("── 蒙特卡洛估值（N=200k）──")
+print("── 蒙特卡洛估值（N=200k, 2026 压缩倍数）──")
 for k, v in quantiles.items():
     print(f"  {k}: ¥{v}亿")
 print(f"  均值: ¥{mc_mean_yi}亿")
 c_post_yi = DS.ROUNDS["C"]["post_money"] / 1e8
-print(f"  加权综合 EV = ¥{weighted_ev_yi}亿 （投资人区间 150-260 亿；C 轮 Post ¥{c_post_yi:.0f}亿留上行空间）")
+print(f"  加权综合 EV = ¥{weighted_ev_yi}亿 （IQR ¥{investor_range_yi[0]:.0f}-{investor_range_yi[1]:.0f}亿；C 轮 Post ¥{c_post_yi:.1f}亿）")
 
 write_json("14_monte_carlo_valuation", payload)
 
